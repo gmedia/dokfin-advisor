@@ -24,16 +24,19 @@ ATURAN PENTING untuk kata kunci pencarian:
 - Kata kunci HARUS berbentuk topik umum tentang industri, bukan tentang bisnis user
 - DILARANG memasukkan angka dari data user ke dalam kata kunci
 - DILARANG menyebut nama apapun (bisnis, orang, kota spesifik kecuali dari profil_bisnis)
-- Format yang benar: "[kondisi/tren/benchmark] [industri] [lokasi opsional] [tahun]"
+- Kata kunci harus cukup spesifik agar hasilnya tidak terlalu general:
+  WAJIB mencakup (industri/sub_industri) + (kota atau provinsi) + (periode/tahun dari profil_bisnis)
+  Contoh format: "[tren/benchmark] [sub_industri] [kota] [Q/bulan + tahun]"
 
 Contoh kata kunci yang BENAR:
-- "tren harga bahan baku restoran Indonesia 2026"
-- "benchmark current ratio UMKM kuliner"
-- "kondisi kredit modal kerja UMKM 2026"
+- "tren harga bahan baku restoran Yogyakarta Q1 2026"
+- "daya beli masyarakat Yogyakarta 2026"
+- "benchmark margin restoran kecil Indonesia 2026"
 
 Contoh kata kunci yang SALAH:
 - "current ratio 0.8 restoran Jakarta" ← ada angka user
 - "stok daging 18 juta menumpuk" ← ada data internal user
+- "digitalisasi UMKM Indonesia" ← terlalu general, tidak spesifik industri + lokasi + periode
 
 Output HARUS berupa JSON valid, tidak ada teks lain di luar JSON:
 
@@ -156,6 +159,16 @@ supplier, bukan kesalahan pembelian berlebihan.
 
 Untuk dimensi SDM: saran harus mengaitkan angka konkret dari data (misalnya selisih ke target
 penjualan, porsi gaji) jika tersedia, bukan hanya ide generik kompetisi internal.
+
+WAJIB (pembeda kualitas Dokfin Advisor):
+- `ringkasan_eksekutif.narasi` WAJIB mengandung baris yang diawali persis dengan:
+  "Insight lintas dimensi:" lalu 1 kalimat insight.
+  Jika tidak ada, tulis: "Insight lintas dimensi: tidak cukup data lintas dimensi: <alasan>".
+  Kalau tidak ada data kuat untuk insight lintas dimensi, tulis "tidak cukup data lintas dimensi"
+  dengan alasan singkat (mis. indikator tren banyak yang kosong).
+- Jika skor suatu dimensi >= 8.0 (SEHAT), `saran` WAJIB berisi 1 saran proaktif low-risk.
+  Contoh: dokumentasikan SOP, set alarm monitoring mingguan, atau checklist pembukaan cabang.
+  Jangan biarkan `saran: []` untuk dimensi skor >= 8.0.
 
 ============================
 PANDUAN REKOMENDASI PRIORITAS

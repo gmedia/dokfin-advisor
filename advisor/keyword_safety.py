@@ -19,6 +19,10 @@ _JUTA_MILYAR_RE = re.compile(r"\b(juta|milyar|miliar|ribu)\b", re.I)
 # Digit detection (any digit is suspicious for "no user numbers" rule)
 _DIGIT_RE = re.compile(r"\d")
 
+# Allow safe time markers (not user-specific numbers): year and quarter.
+_YEAR_RE = re.compile(r"\b(202[0-9]|2030)\b")
+_QUARTER_RE = re.compile(r"\bq[1-4]\b", re.I)
+
 
 def _normalize_keyword(raw: str) -> str:
     s = unicodedata.normalize("NFKC", raw).strip().lower()
@@ -29,10 +33,15 @@ def _normalize_keyword(raw: str) -> str:
 def _is_safe_keyword(normalized: str) -> bool:
     if not normalized or len(normalized) < 8:
         return False
-    if _DIGIT_RE.search(normalized):
-        return False
     if _URL_RE.search(normalized) or _EMAIL_RE.search(normalized):
         return False
+    if _DIGIT_RE.search(normalized):
+        # Only allow digits when they look like a time marker (year / quarter),
+        # otherwise assume it's leaking user-specific numbers (PRD 5.3).
+        without_allowed = _YEAR_RE.sub("", normalized)
+        without_allowed = _QUARTER_RE.sub("", without_allowed)
+        if _DIGIT_RE.search(without_allowed):
+            return False
     return not (_RP_RE.search(normalized) or _JUTA_MILYAR_RE.search(normalized))
 
 

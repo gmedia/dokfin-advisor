@@ -26,6 +26,16 @@ def test_rejects_numbers_and_rp() -> None:
     assert "tren harga bahan baku umkm" in out
 
 
+def test_allows_year_and_quarter_time_markers() -> None:
+    kws = [
+        "tren harga bahan baku restoran yogyakarta 2026",
+        "benchmark margin restoran kecil indonesia q1 2026",
+    ]
+    out = sanitize_search_keywords(kws)
+    assert "2026" in out[0]
+    assert "q1" in out[1]
+
+
 def test_max_three_items() -> None:
     kws = [
         "satu keyword panjang untuk uji",

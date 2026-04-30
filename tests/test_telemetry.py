@@ -78,6 +78,29 @@ def test_estimate_cost_idr_google_when_env_set() -> None:
     assert c == 4000.0
 
 
+def test_estimate_cost_idr_google_per_model_key_when_env_set() -> None:
+    acc = TokenUsageAccumulator()
+    acc.node_a_input = 1_000_000
+    acc.node_a_output = 0
+    acc.node_c_input = 0
+    acc.node_c_output = 0
+    with patch.dict(
+        os.environ,
+        {
+            "GOOGLE_PRICE_gemini_3_1_pro_preview_INPUT_PER_M_IDR": "2222",
+            "GOOGLE_PRICE_gemini_3_1_pro_preview_OUTPUT_PER_M_IDR": "9999",
+        },
+        clear=False,
+    ):
+        c = estimate_cost_idr(
+            acc,
+            model_a="gemini-3.1-pro-preview",
+            model_c="gemini-3.1-pro-preview",
+            llm_provider="google",
+        )
+    assert c == 2222.0
+
+
 def test_estimate_cost_idr_when_env_set() -> None:
     acc = TokenUsageAccumulator()
     acc.node_a_input = 1_000_000

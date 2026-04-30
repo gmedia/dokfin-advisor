@@ -54,3 +54,5 @@ Service `advisor` memakai `NATS_URL=nats://nats:4222` dan `REDIS_URL=redis://red
 
 Waktu pemrosesan banyak bergantung pada Node C (LLM); respons bisa puluhan detik — set ekspektasi di UI (indikator tahap / loading).
 
+Untuk meningkatkan relevansi konteks pasar, disarankan mengaktifkan `TAVILY_DROP_UNDATED=1` agar artikel tanpa tanggal terbit tidak ikut terpilih.
+

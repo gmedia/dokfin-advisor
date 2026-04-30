@@ -50,6 +50,24 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
+def _freshness_bonus(content: str, pub: date | None, *, reference_date: date) -> float:
+    """Heuristik kecil untuk prefer hasil yang lebih fresh dan informatif (tanpa hard filter)."""
+    bonus = 0.0
+    c = content.lower()
+    if pub is not None:
+        age_days = (reference_date - pub).days
+        if age_days <= 31:
+            bonus += 0.12
+        elif age_days <= 93:
+            bonus += 0.07
+        elif age_days <= 183:
+            bonus += 0.03
+    # Prefer statistik/angka umum dan periode (biasanya artikel lebih konkret).
+    if any(x in c for x in ("2025", "2026", "q1", "q2", "q3", "q4", "%")):
+        bonus += 0.05
+    return bonus
+
+
 def _hostname_in_trust_list(host: str, trusted: set[str]) -> bool:
     if not trusted:
         return True
@@ -93,6 +111,7 @@ def filter_tavily_results(
         if pub is not None and pub < cutoff:
             continue
         score = float(r.get("score") or 0.0)
+        score += _freshness_bonus(content, pub, reference_date=reference_date)
         scored.append((score, r))
 
     scored.sort(key=lambda x: x[0], reverse=True)
