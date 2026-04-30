@@ -1,4 +1,9 @@
-"""Build human-readable summaries for prompts (Node A: PRD §6.2 user block)."""
+"""Build human-readable summaries for prompts (Node A: PRD §6.2 user block).
+
+Field tambahan per indikator tetap di payload (`extra="allow"`) dan dikirim utuh ke
+Node C sebagai JSON. Teks Node A hanya mengikuti format baris di PRD §6.2 (bukan
+cuplikan field ekstra). Scoring deterministik hanya membaca `status`.
+"""
 
 from __future__ import annotations
 

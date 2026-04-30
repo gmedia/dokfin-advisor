@@ -26,6 +26,19 @@ def test_node_a_user_text_matches_prd_shape() -> None:
     assert "- PAT_03 Kecocokan catatan kas vs rekening bank: —" in text
 
 
+REALITY = Path(__file__).resolve().parent / "fixtures" / "payload_reality.json"
+
+
+def test_payload_reality_node_a_follows_prd_lines_only() -> None:
+    """Fixture Laravel kaya field; Node A tetap hanya baris PRD §6.2 (detail ke Node C)."""
+    payload = JobPayload.model_validate(json.loads(REALITY.read_text(encoding="utf-8")))
+    text = build_node_a_user_text(payload)
+    assert "Yogyakarta" in text
+    assert "- KES_01 Kemampuan bayar harian: 1.1 x → PERLU_PERHATIAN" in text
+    assert "- PAT_01 Status pajak: LUNAS → SEHAT" in text
+    assert "- PAT_03 Kecocokan catatan kas vs rekening bank: SEHAT" in text
+
+
 def test_pat03_only_status_no_double_arrow() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     data["dimensi"]["kepatuhan"]["PAT_03"] = {"status": "PERLU_PERHATIAN"}

@@ -1,0 +1,196 @@
+{
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
+    "created_at": "2026-04-28T09:00:00Z",
+  
+    "profil_bisnis": {
+      "industri": "F&B Retail",
+      "sub_industri": "Restoran",
+      "kota": "Yogyakarta",
+      "skala": "UMKM",
+      "jumlah_karyawan": 8,
+      "periode_analisis": "Maret 2026",
+      "periode_bulan": 3,
+      "periode_tahun": 2026,
+      "kelengkapan_data_persen": 100
+    },
+  
+    "dimensi": {
+  
+      "likuiditas": {
+        "KES_01": {
+          "nilai": 1.1,
+          "satuan": "x",
+          "status": "PERLU_PERHATIAN",
+          "rata_rata_kas_harian": 3200000,
+          "rata_rata_bank_harian": 8500000,
+          "rata_rata_pengeluaran_harian": 10636363
+        },
+        "KES_02": {
+          "nilai": 0.74,
+          "satuan": "x",
+          "status": "KRITIS",
+          "total_aset_lancar": 92000000,
+          "total_hutang_lancar": 124000000
+        },
+        "KES_03": {
+          "nilai_hari": 22,
+          "satuan": "hari",
+          "status": "SEHAT",
+          "total_piutang": 18000000,
+          "breakdown_per_kategori": [
+            { "kategori": "horeka", "nilai": 12000000, "hari_rata_rata": 28 },
+            { "kategori": "retail", "nilai": 4500000,  "hari_rata_rata": 15 },
+            { "kategori": "grosir", "nilai": 1500000,  "hari_rata_rata": 10 }
+          ]
+        },
+        "KES_04": {
+          "nilai": 4200000,
+          "satuan": "IDR",
+          "status": "PERLU_PERHATIAN",
+          "tren_persen": -22.4,
+          "streak_positif_bulan": 3
+        }
+      },
+  
+      "profitabilitas": {
+        "PRO_01": {
+          "nilai": 34.8,
+          "satuan": "%",
+          "status": "SEHAT",
+          "tren_persen": -1.8
+        },
+        "PRO_02": {
+          "nilai": 8.2,
+          "satuan": "%",
+          "status": "PERLU_PERHATIAN",
+          "tren_persen": -3.1
+        },
+        "PRO_03": {
+          "nilai": 9.4,
+          "satuan": "%",
+          "status": "PERLU_PERHATIAN"
+        },
+        "PRO_04": {
+          "nilai": -12.6,
+          "satuan": "%",
+          "status": "KRITIS",
+          "streak_turun_bulan": 3
+        },
+        "PRO_05": {
+          "nilai_bep_rupiah": 145000000,
+          "penjualan_aktual": 162000000,
+          "rasio_aktual": 1.12,
+          "status": "PERLU_PERHATIAN"
+        }
+      },
+  
+      "efisiensi": {
+        "EFI_01": {
+          "nilai_hari": 19,
+          "satuan": "hari",
+          "status": "SEHAT",
+          "breakdown_kategori": [
+            { "kategori": "daging",     "jumlah_item": 3, "nilai_idr": 4200000,  "idle_rata_rata": 6,  "idle_terlama": 9  },
+            { "kategori": "sayur_buah", "jumlah_item": 8, "nilai_idr": 2800000,  "idle_rata_rata": 4,  "idle_terlama": 7  },
+            { "kategori": "cair",       "jumlah_item": 6, "nilai_idr": 5100000,  "idle_rata_rata": 18, "idle_terlama": 24 },
+            { "kategori": "bumbu",      "jumlah_item": 12,"nilai_idr": 3600000,  "idle_rata_rata": 22, "idle_terlama": 31 },
+            { "kategori": "kemasan",    "jumlah_item": 4, "nilai_idr": 1200000,  "idle_rata_rata": 28, "idle_terlama": 35 }
+          ]
+        },
+        "EFI_02": {
+          "nilai": 65.2,
+          "satuan": "%",
+          "status": "PERLU_PERHATIAN",
+          "tren_delta": 3.4
+        },
+        "EFI_03": {
+          "nilai": 1.18,
+          "satuan": "x",
+          "status": "PERLU_PERHATIAN"
+        },
+        "EFI_04": {
+          "nilai_total_idr": 8200000,
+          "jumlah_item_total": 6,
+          "persen_dari_total_stok": 9.8,
+          "idle_terlama_hari": 35,
+          "idle_rata_rata_hari": 26,
+          "tren_vs_periode_lalu": "membaik",
+          "delta_nilai_idr": -3100000,
+          "ada_perishable_kritis": false,
+          "status": "SEHAT"
+        },
+        "EFI_05": {
+          "persen_error": 0,
+          "nilai_selisih_idr": 0,
+          "status": "SEHAT"
+        }
+      },
+  
+      "solvabilitas": {
+        "SOL_01": {
+          "nilai": 1.68,
+          "satuan": "x",
+          "status": "PERLU_PERHATIAN",
+          "total_kewajiban": 210000000,
+          "total_ekuitas": 125000000
+        },
+        "SOL_02": {
+          "persen_jangka_pendek": 59,
+          "persen_jangka_panjang": 41,
+          "ada_jatuh_tempo_30_hari": true,
+          "nilai_jatuh_tempo_idr": 28000000,
+          "status": "PERLU_PERHATIAN"
+        },
+        "SOL_03": {
+          "nilai_buku_bersih_idr": 48000000,
+          "rasio_depresiasi_persen": 44,
+          "status": "SEHAT"
+        },
+        "SOL_04": {
+          "nilai": 1.08,
+          "satuan": "x",
+          "status": "PERLU_PERHATIAN"
+        }
+      },
+  
+      "sdm": {
+        "SDM_01": {
+          "nilai": 27.4,
+          "satuan": "%",
+          "status": "SEHAT",
+          "tren_delta": 1.2
+        },
+        "SDM_02": {
+          "nilai_idr": 20250000,
+          "satuan": "IDR",
+          "status": "SEHAT",
+          "tren_persen": -8.4
+        },
+        "SDM_03": {
+          "pencapaian_persen": 84.4,
+          "gap_idr": -25320000,
+          "status": "KRITIS"
+        }
+      },
+  
+      "kepatuhan": {
+        "PAT_01": {
+          "status_bayar": "LUNAS",
+          "hari_tersisa": null,
+          "persen_keterlambatan_historis": 0,
+          "status": "SEHAT"
+        },
+        "PAT_02": {
+          "kelengkapan_persen": 100,
+          "modul_kosong": [],
+          "status": "SEHAT"
+        },
+        "PAT_03": {
+          "selisih_idr": 0,
+          "status_balance": true,
+          "streak_balance_bulan": 5,
+          "status": "SEHAT"
+        }
+      }
+    }
+  }

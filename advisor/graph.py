@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from datetime import UTC, datetime
 from typing import Any, Literal, TypedDict
 from uuid import UUID, uuid4
@@ -220,6 +221,13 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
     if deps.token_usage is not None:
         deps.token_usage.reset()
 
+    t0 = time.perf_counter()
+
+    def _with_processing_time(result: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(result)
+        merged["processing_time_seconds"] = round(time.perf_counter() - t0, 3)
+        return merged
+
     try:
         app = build_graph(deps).compile()
         out = app.invoke({"payload": payload})
@@ -232,11 +240,11 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
             retry_count=MAX_LLM_ATTEMPTS,
         )
         base = failed.model_dump(mode="json")
-        return merge_telemetry_into_result(deps, base)
+        return _with_processing_time(merge_telemetry_into_result(deps, base))
 
     if out.get("final_output"):
-        return merge_telemetry_into_result(deps, out["final_output"])
+        return _with_processing_time(merge_telemetry_into_result(deps, out["final_output"]))
     if out.get("failed_output"):
-        return merge_telemetry_into_result(deps, out["failed_output"])
+        return _with_processing_time(merge_telemetry_into_result(deps, out["failed_output"]))
     _LOG.error("graph_no_terminal", job_id=out.get("job_id"))
     raise RuntimeError("graph finished without final_output or failed_output")
