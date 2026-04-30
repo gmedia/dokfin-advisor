@@ -51,16 +51,28 @@ def merge_konteks_pasar_transparency(
         out["konteks_pasar"] = [dict(x) for x in seed if isinstance(x, dict)]
         return
 
+    def _looks_like_hostname(value: str) -> bool:
+        v = (value or "").strip().lower()
+        # Heuristik: hostname biasanya mengandung titik dan tidak mengandung spasi.
+        return bool(v) and "." in v and " " not in v
+
     for item in kp:
         if not isinstance(item, dict):
             continue
-        dom = _normalize_sumber(item.get("sumber"))
+        raw_src = str(item.get("sumber") or "")
+        dom = _normalize_sumber(raw_src)
         src = by_domain.get(dom) if dom else None
         if src:
             if not item.get("diakses_pada") and src.get("diakses_pada"):
                 item["diakses_pada"] = src["diakses_pada"]
             if not item.get("sumber") and src.get("sumber"):
                 item["sumber"] = src["sumber"]
+        else:
+            # Jika LLM mengisi `sumber` bukan hostname (mis. judul laporan),
+            # lebih aman untuk transparansi: pakai seed Node B apa adanya.
+            if raw_src and not _looks_like_hostname(raw_src):
+                out["konteks_pasar"] = [dict(x) for x in seed if isinstance(x, dict)]
+                return
 
 
 def merge_deterministic_into_raw(
@@ -119,6 +131,10 @@ def merge_deterministic_into_raw(
 
     kp = out.get("konteks_pasar")
     if not isinstance(kp, list):
+        out["konteks_pasar"] = []
+    # Jika Node B tidak menghasilkan seed (mis. filter terlalu ketat / Tavily gagal),
+    # jangan biarkan LLM mengarang konteks pasar (PRD: fallback boleh kosong).
+    if not konteks_pasar_seed:
         out["konteks_pasar"] = []
 
     merge_konteks_pasar_transparency(out, konteks_pasar_seed)

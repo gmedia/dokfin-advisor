@@ -70,3 +70,29 @@ def test_merge_trend_from_prev_skor() -> None:
     sk = merged["skor_keseluruhan"]
     assert sk["trend"] in ("naik", "turun", "stabil")
     assert sk["vs_periode_lalu"] is not None
+
+
+def test_merge_clears_konteks_pasar_when_no_seed() -> None:
+    payload = JobPayload.model_validate(json.loads(FIXTURE_MIN.read_text(encoding="utf-8")))
+    dim = payload.dimensi.model_dump(mode="json")
+    skor_pd = skor_from_payload_dimensi(dim)
+    skor_k = hitung_skor_keseluruhan(skor_pd)
+    raw: dict = {
+        "konteks_pasar": [
+            {
+                "topik": "x",
+                "konten": "y",
+                "dampak_ke_bisnis": "z",
+                "relevansi": "TINGGI",
+                "sumber": "Laporan F&B 2026",
+            }
+        ]
+    }
+    merged = merge_deterministic_into_raw(
+        payload=payload,
+        skor_per_dimensi=skor_pd,
+        skor_keseluruhan=skor_k,
+        raw=raw,
+        konteks_pasar_seed=None,
+    )
+    assert merged["konteks_pasar"] == []

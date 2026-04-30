@@ -74,6 +74,11 @@ def _hostname_in_trust_list(host: str, trusted: set[str]) -> bool:
     host = host.lower()
     if host in trusted:
         return True
+    allow_subdomains = (
+        os.environ.get("TAVILY_ALLOW_SUBDOMAINS", "1").strip().lower() in ("1", "true", "yes")
+    )
+    if not allow_subdomains:
+        return False
     return any(host == d or host.endswith("." + d) for d in trusted)
 
 

@@ -7,7 +7,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from tavily import TavilyClient
@@ -155,13 +155,27 @@ def run_search(
             resp = _search_with_retries(client, kw, timeout_s, include_domains=include_domains)
             answer = str(resp.get("answer") or "")
             results = list(resp.get("results") or [])
+            min_words = int(os.environ.get("TAVILY_MIN_WORDS", "100"))
+            primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
+            fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
+
             filtered = filter_tavily_results(
                 results,
                 trusted_domains=trusted,
                 reference_date=ref_date,
                 max_keep=3,
-                min_words=int(os.environ.get("TAVILY_MIN_WORDS", "100")),
+                min_words=min_words,
+                max_age=timedelta(days=primary_days),
             )
+            if not filtered:
+                filtered = filter_tavily_results(
+                    results,
+                    trusted_domains=trusted,
+                    reference_date=ref_date,
+                    max_keep=3,
+                    min_words=min_words,
+                    max_age=timedelta(days=fallback_days),
+                )
             access_date = ref_date.isoformat()
             block = _format_market_block(kw, answer, filtered)
             seeds = _seeds_from_results(filtered, access_date)

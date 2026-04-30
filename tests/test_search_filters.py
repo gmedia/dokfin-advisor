@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from advisor.merge_output import merge_konteks_pasar_transparency
 from advisor.search_filters import filter_tavily_results
@@ -75,6 +76,72 @@ def test_filter_drop_undated_excludes_when_enabled() -> None:
     assert "dated" in out[0]["url"]
 
 
+def test_filter_rejects_subdomain_when_allow_subdomains_disabled() -> None:
+    ref = date(2026, 4, 30)
+    trusted = {"kompas.com"}
+    results = [
+        {
+            "url": "https://cahaya.kompas.com/x",
+            "title": "X",
+            "content": "word " * 30,
+            "score": 0.9,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://kompas.com/y",
+            "title": "Y",
+            "content": "word " * 30,
+            "score": 0.1,
+            "published_date": ref.isoformat(),
+        },
+    ]
+    with patch.dict("os.environ", {"TAVILY_ALLOW_SUBDOMAINS": "0"}, clear=False):
+        out = filter_tavily_results(
+            results,
+            trusted_domains=trusted,
+            reference_date=ref,
+            max_keep=3,
+            min_words=20,
+        )
+    assert len(out) == 1
+    assert out[0]["url"].startswith("https://kompas.com/")
+
+
+def test_filter_two_pass_example_primary_empty_then_fallback_hits() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    older = (ref - timedelta(days=40)).isoformat()
+    results = [
+        {
+            "url": "https://x/older",
+            "title": "Old",
+            "content": "word " * 30,
+            "score": 0.5,
+            "published_date": older,
+        }
+    ]
+    # Primary 30d should drop it
+    primary = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=30),
+    )
+    assert primary == []
+    # Fallback 60d should accept it
+    fallback = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=60),
+    )
+    assert len(fallback) == 1
+
+
 def test_filter_max_three_by_score() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()
@@ -138,3 +205,31 @@ def test_merge_empty_kp_uses_seed() -> None:
     merge_konteks_pasar_transparency(out, seed)
     assert len(out["konteks_pasar"]) == 1
     assert out["konteks_pasar"][0]["sumber"] == "ojk.go.id"
+
+
+def test_merge_replaces_llm_non_hostname_sources_with_seed() -> None:
+    out: dict = {
+        "konteks_pasar": [
+            {
+                "topik": "t",
+                "konten": "k",
+                "dampak_ke_bisnis": "d",
+                "relevansi": "TINGGI",
+                "sumber": "Laporan Tren F&B Yogyakarta Q1 2026",
+                "diakses_pada": None,
+            }
+        ]
+    }
+    seed = [
+        {
+            "topik": "x",
+            "konten": "y",
+            "dampak_ke_bisnis": "z",
+            "relevansi": "TINGGI",
+            "sumber": "kompas.com",
+            "diakses_pada": "2026-04-30",
+        }
+    ]
+    merge_konteks_pasar_transparency(out, seed)
+    assert out["konteks_pasar"][0]["sumber"] == "kompas.com"
+    assert out["konteks_pasar"][0]["diakses_pada"] == "2026-04-30"
