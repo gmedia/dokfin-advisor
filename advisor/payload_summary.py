@@ -1,23 +1,11 @@
-"""Build human-readable summaries for prompts (Node A: status-only, no numeric values)."""
+"""Build human-readable summaries for prompts (Node A: PRD §6.2 user block)."""
 
 from __future__ import annotations
 
+import math
+from typing import Any
+
 from advisor.schemas.input import JobPayload
-
-
-def _lines_for_block(block: dict[str, object], labels: dict[str, str]) -> list[str]:
-    lines: list[str] = []
-    for code, row in sorted(block.items()):
-        if not isinstance(row, dict):
-            continue
-        st = row.get("status")
-        if st is None:
-            continue
-        label = labels.get(code, code)
-        key = getattr(st, "value", st)
-        lines.append(f"- {code} {label}: → {key}")
-    return lines
-
 
 _NODE_A_LABELS: dict[str, dict[str, str]] = {
     "likuiditas": {
@@ -59,10 +47,137 @@ _NODE_A_LABELS: dict[str, dict[str, str]] = {
 }
 
 
+def _row_dict(row: object) -> dict[str, Any]:
+    if row is None:
+        return {}
+    if isinstance(row, dict):
+        return row
+    if hasattr(row, "model_dump"):
+        return row.model_dump(mode="json")
+    return {}
+
+
+def _status_str(row: dict[str, Any]) -> str:
+    st = row.get("status")
+    if st is None:
+        return "—"
+    return str(getattr(st, "value", st))
+
+
+def _num_str(v: Any) -> str:
+    if v is None:
+        return "—"
+    if isinstance(v, bool):
+        return str(v)
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if math.isnan(f):
+        return "—"
+    if abs(f - round(f)) < 1e-9:
+        return str(int(round(f)))
+    s = f"{f:.2f}"
+    return s.rstrip("0").rstrip(".")
+
+
+def _idr_pretty(v: Any) -> str:
+    if v is None:
+        return "—"
+    if isinstance(v, str) and v.strip():
+        return v.strip()
+    try:
+        n = int(round(float(v)))
+    except (TypeError, ValueError):
+        return str(v)
+    neg = n < 0
+    n = abs(n)
+    raw = f"{n:,}"
+    s = ".".join(raw.split(","))
+    prefix = "-Rp " if neg else "Rp "
+    return prefix + s
+
+
+def _mid_fragment(code: str, row: dict[str, Any]) -> str:
+    if code == "KES_01" or code == "KES_02":
+        return f"{_num_str(row.get('nilai'))} x"
+    if code == "KES_03":
+        return f"{_num_str(row.get('nilai_hari'))} hari"
+    if code == "KES_04":
+        fmt = row.get("nilai_formatted")
+        if isinstance(fmt, str) and fmt.strip():
+            return fmt.strip()
+        n = row.get("nilai")
+        if n is not None:
+            return _num_str(n)
+        return "—"
+    if code in ("PRO_01", "PRO_02", "PRO_03", "PRO_04"):
+        return f"{_num_str(row.get('nilai'))}%"
+    if code == "PRO_05":
+        v = row.get("rasio_aktual", row.get("nilai"))
+        return f"{_num_str(v)}x"
+    if code == "EFI_01":
+        return f"{_num_str(row.get('nilai_hari'))} hari"
+    if code == "EFI_02":
+        return f"{_num_str(row.get('nilai'))}%"
+    if code == "EFI_03":
+        return f"{_num_str(row.get('nilai'))}x"
+    if code == "EFI_04":
+        fmt = row.get("nilai_total_idr_formatted")
+        if isinstance(fmt, str) and fmt.strip():
+            return fmt.strip()
+        return _idr_pretty(row.get("nilai_total_idr"))
+    if code == "EFI_05":
+        return f"{_num_str(row.get('persen_error'))}% error"
+    if code == "SOL_01" or code == "SOL_04":
+        return f"{_num_str(row.get('nilai'))}x"
+    if code == "SOL_02":
+        return f"{_num_str(row.get('persen_jangka_pendek'))}% pendek"
+    if code == "SOL_03":
+        return f"{_num_str(row.get('rasio_depresiasi_persen'))}% terdepresiasi"
+    if code == "SDM_01":
+        return f"{_num_str(row.get('nilai'))}%"
+    if code == "SDM_02":
+        fmt = row.get("nilai_idr_formatted")
+        if isinstance(fmt, str) and fmt.strip():
+            return fmt.strip()
+        return _idr_pretty(row.get("nilai_idr"))
+    if code == "SDM_03":
+        return f"{_num_str(row.get('pencapaian_persen'))}%"
+    if code == "PAT_02":
+        return f"{_num_str(row.get('kelengkapan_persen'))}%"
+    return "—"
+
+
+def _format_indicator_line(code: str, label: str, row: dict[str, Any]) -> str:
+    st = _status_str(row)
+    if code == "PAT_03":
+        return f"- {code} {label}: {st}"
+    if code == "PAT_01":
+        sb = row.get("status_bayar", "—")
+        if sb is None or sb == "":
+            sb = "—"
+        return f"- {code} {label}: {sb} → {st}"
+
+    mid = _mid_fragment(code, row)
+    return f"- {code} {label}: {mid} → {st}"
+
+
+def _lines_for_block(block: dict[str, object], dim_key: str) -> list[str]:
+    labels = _NODE_A_LABELS[dim_key]
+    lines: list[str] = []
+    for code in sorted(labels.keys()):
+        label = labels[code]
+        raw = block.get(code)
+        rd = _row_dict(raw)
+        lines.append(_format_indicator_line(code, label, rd))
+    return lines
+
+
 def build_node_a_user_text(payload: JobPayload) -> str:
-    """Ringkasan status saja (tanpa angka) untuk Node A — mengurangi risiko keyword bocor."""
+    """User prompt Node A — sama struktur PRD §6.2 (nilai + status per indikator)."""
     p = payload.profil_bisnis
-    dim = payload.dimensi.model_dump()
+    dim = payload.dimensi.model_dump(mode="json")
     sections: list[str] = [
         "DATA INDIKATOR (ringkasan status saja):",
         "",
@@ -72,21 +187,21 @@ def build_node_a_user_text(payload: JobPayload) -> str:
         ),
         "",
         "Likuiditas:",
-        *_lines_for_block(dim["likuiditas"], _NODE_A_LABELS["likuiditas"]),
+        *_lines_for_block(dim["likuiditas"], "likuiditas"),
         "",
         "Profitabilitas:",
-        *_lines_for_block(dim["profitabilitas"], _NODE_A_LABELS["profitabilitas"]),
+        *_lines_for_block(dim["profitabilitas"], "profitabilitas"),
         "",
         "Efisiensi:",
-        *_lines_for_block(dim["efisiensi"], _NODE_A_LABELS["efisiensi"]),
+        *_lines_for_block(dim["efisiensi"], "efisiensi"),
         "",
         "Solvabilitas:",
-        *_lines_for_block(dim["solvabilitas"], _NODE_A_LABELS["solvabilitas"]),
+        *_lines_for_block(dim["solvabilitas"], "solvabilitas"),
         "",
         "SDM:",
-        *_lines_for_block(dim["sdm"], _NODE_A_LABELS["sdm"]),
+        *_lines_for_block(dim["sdm"], "sdm"),
         "",
         "Kepatuhan:",
-        *_lines_for_block(dim["kepatuhan"], _NODE_A_LABELS["kepatuhan"]),
+        *_lines_for_block(dim["kepatuhan"], "kepatuhan"),
     ]
     return "\n".join(sections)
