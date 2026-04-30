@@ -134,30 +134,30 @@ def _contains_any(haystack: str, needles: tuple[str, ...]) -> bool:
     return any(n in haystack for n in needles)
 
 
-def _relevance_score_for_business(result: dict[str, Any], *, payload: JobPayload) -> float:
-    """Deterministic relevance heuristic; higher is more relevant."""
-    text = (
-        f"{result.get('title') or ''} {result.get('content') or ''} {result.get('url') or ''}"
-    ).lower()
+def _tokenize(text: str) -> set[str]:
+    out: set[str] = set()
+    cleaned = (text or "").lower().replace("f&b", "fnb").replace("&", " ").replace("/", " ")
+    for raw in cleaned.split():
+        tok = "".join(ch for ch in raw if ch.isalnum())
+        if len(tok) >= 3:
+            out.add(tok)
+    return out
 
-    # Hard negative topics that often show up on trusted domains but irrelevant for F&B UMKM.
-    hard_blacklist = (
-        "gaikindo",
-        "otomotif",
-        "mobil",
-        "kendaraan",
-        "rokok",
-        "tembakau",
-        "sigaret",
-        "logistik",
-        "ekspor",
-        "impor",
-        "pandemi",
-        "covid",
-        "giiass",
-    )
-    if _contains_any(text, hard_blacklist):
-        return -999.0
+
+def _relevance_score_for_business(
+    result: dict[str, Any],
+    *,
+    payload: JobPayload,
+    keyword: str,
+) -> float:
+    """Deterministic relevance heuristic.
+
+    No industry blacklist: relevansi harus naik dari kecocokan ke keyword + profil bisnis.
+    """
+    title = str(result.get("title") or "")
+    content = str(result.get("content") or "")
+    url = str(result.get("url") or "")
+    text = f"{title} {content} {url}".lower()
 
     industri = _normalize_text(payload.profil_bisnis.industri)
     sub = _normalize_text(payload.profil_bisnis.sub_industri)
@@ -170,31 +170,73 @@ def _relevance_score_for_business(result: dict[str, Any], *, payload: JobPayload
     if kota in ("jogja",):
         kota_aliases = ("yogyakarta", "jogja", "diy")
 
+    business_terms: set[str] = set()
+    if industri:
+        business_terms.update(_tokenize(industri))
+    if sub:
+        business_terms.update(_tokenize(sub))
+    for k in kota_aliases:
+        business_terms.update(_tokenize(k))
+
+    kw_terms = _tokenize(keyword)
+    generic_query_terms = {
+        "tren",
+        "penjualan",
+        "permintaan",
+        "konsumen",
+        "umkm",
+        "daya",
+        "beli",
+        "benchmark",
+        "retail",
+        "maret",
+        "april",
+        "mei",
+        "januari",
+        "februari",
+        "juni",
+        "juli",
+        "agustus",
+        "september",
+        "oktober",
+        "november",
+        "desember",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "2024",
+        "2025",
+        "2026",
+    }
+    kw_terms = {t for t in kw_terms if t not in generic_query_terms}
+    text_terms = _tokenize(text)
+
+    business_hit = len(text_terms & business_terms)
+    keyword_hit = len(text_terms & kw_terms)
+
+    # Hard gate: must match keyword OR business profile, otherwise it's likely off-topic.
+    if business_hit <= 0 and keyword_hit <= 0:
+        return -1.0
+
     score = 0.0
-    # Core F&B terms
-    fnb_terms = ("f&b", "kuliner", "restoran", "rumah makan", "kafe", "cafe", "makanan", "minuman")
-    if _contains_any(text, fnb_terms):
-        score += 2.0
-    # UMKM / demand terms
+    score += min(3.0, float(keyword_hit)) * 1.2
+    score += min(3.0, float(business_hit)) * 1.0
+
+    # Generic demand signals (small bonus only; shouldn't override core match).
     demand_terms = (
         "umkm",
         "konsumen",
         "penjualan",
         "permintaan",
-        "daya beli",
-        "pesan antar",
+        "daya",
+        "beli",
         "delivery",
+        "ramadan",
+        "lebaran",
     )
     if _contains_any(text, demand_terms):
-        score += 1.0
-    # Industry/sub-industry mentions (if present)
-    if industri and industri in text:
-        score += 1.0
-    if sub and sub in text:
-        score += 1.0
-    # Location mention
-    if kota_aliases and any(k and k in text for k in kota_aliases):
-        score += 1.0
+        score += 0.6
 
     return score
 
@@ -203,11 +245,12 @@ def _rank_and_filter_by_relevance(
     results: list[dict[str, Any]],
     *,
     payload: JobPayload,
+    keyword: str,
     min_relevance: float,
 ) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for r in results:
-        rel = _relevance_score_for_business(r, payload=payload)
+        rel = _relevance_score_for_business(r, payload=payload, keyword=keyword)
         if rel < 0:
             continue
         if rel < min_relevance:
@@ -403,6 +446,7 @@ def run_search(
             rel_filtered = _rank_and_filter_by_relevance(
                 results,
                 payload=payload,
+                keyword=kw,
                 min_relevance=min_relevance,
             )
 

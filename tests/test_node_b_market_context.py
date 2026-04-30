@@ -35,7 +35,7 @@ def _payload_fnb_jogja() -> JobPayload:
     )
 
 
-def test_rank_and_filter_by_relevance_drops_hard_blacklist() -> None:
+def test_rank_and_filter_by_relevance_requires_keyword_or_profile_match() -> None:
     payload = _payload_fnb_jogja()
     results = [
         {
@@ -51,7 +51,12 @@ def test_rank_and_filter_by_relevance_drops_hard_blacklist() -> None:
             "score": 0.1,
         },
     ]
-    out = _rank_and_filter_by_relevance(results, payload=payload, min_relevance=1.0)
+    out = _rank_and_filter_by_relevance(
+        results,
+        payload=payload,
+        keyword="tren penjualan f&b yogyakarta maret 2026",
+        min_relevance=1.0,
+    )
     assert len(out) == 1
     assert "fnb" in out[0]["url"]
     assert out[0]["score"] > 0.1
