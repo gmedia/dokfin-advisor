@@ -1,0 +1,38 @@
+# GitLab CI: lint (Ruff) + tests (pytest) using uv + frozen lockfile.
+# Requires: Python 3.12 runner image; no Docker-in-Docker needed for these jobs.
+
+default:
+  image: python:3.12-slim-bookworm
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+
+cache:
+  key:
+    files:
+      - uv.lock
+  paths:
+    - .cache/uv
+
+stages:
+  - lint
+  - test
+
+.before_uv: &before_uv
+  before_script:
+    - pip install --no-cache-dir "uv>=0.5"
+    - uv sync --frozen --all-groups
+
+lint:
+  stage: lint
+  <<: *before_uv
+  script:
+    - uv run ruff check .
+    - uv run ruff format --check .
+
+test:
+  stage: test
+  <<: *before_uv
+  script:
+    - uv run pytest -q --tb=short

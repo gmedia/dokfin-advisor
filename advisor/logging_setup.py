@@ -46,7 +46,7 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 
 
 def log_node_timing(
-    logger: structlog.stdlib.BoundLogger,
+    logger: structlog.BoundLogger,
     *,
     job_id: str,
     node: str,

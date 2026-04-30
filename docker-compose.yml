@@ -1,0 +1,25 @@
+services:
+  advisor:
+    build: .
+    env_file:
+      - .env.example
+    environment:
+      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      nats:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  nats:
+    image: nats:2.10-alpine
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
