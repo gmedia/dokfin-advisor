@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
+from advisor.cost_estimate import estimate_cost_idr
 from advisor.deps import AdvisorDeps
 from advisor.logging_setup import get_logger
 from advisor.nodes.contextualize import make_contextualize_node
@@ -22,6 +23,21 @@ from advisor.schemas.output import AdvisorResultFailed, ErrorCode
 from advisor.scoring import hitung_skor_keseluruhan, skor_from_payload_dimensi
 
 _LOG = get_logger(__name__)
+
+
+def merge_telemetry_into_result(deps: AdvisorDeps, result: dict[str, Any]) -> dict[str, Any]:
+    """Attach token_usage and estimated_cost_idr when accumulator has data."""
+    acc = deps.token_usage
+    if acc is None or acc.is_empty():
+        return result
+    out = dict(result)
+    tu = acc.to_token_usage()
+    if tu:
+        out["token_usage"] = tu.model_dump(mode="json")
+    cost = estimate_cost_idr(acc, model_a=deps.model_name_a, model_c=deps.model_name_c)
+    if cost is not None:
+        out["estimated_cost_idr"] = cost
+    return out
 
 
 class AdvisorState(TypedDict, total=False):
@@ -102,19 +118,25 @@ def build_default_deps() -> AdvisorDeps:
 
     from langchain_openai import ChatOpenAI
 
+    from advisor.cache import MemoryTTLCache
+    from advisor.llm_usage import TokenUsageAccumulator
+
     model_a = os.environ.get("OPENAI_MODEL_A", "gpt-4o-mini")
     model_c = os.environ.get("OPENAI_MODEL_C", "gpt-4o")
     timeout_s = float(os.environ.get("OPENAI_TIMEOUT_S", "120"))
     llm_a = ChatOpenAI(model=model_a, temperature=0, timeout=timeout_s)
     llm_c = ChatOpenAI(model=model_c, temperature=0.2, timeout=timeout_s)
+    acc = TokenUsageAccumulator()
 
     def invoke_a(messages: list) -> str:
-        return str(llm_a.invoke(messages).content or "")
+        r = llm_a.invoke(messages)
+        acc.add_node_a(r)
+        return str(r.content or "")
 
     def invoke_c(messages: list) -> str:
-        return str(llm_c.invoke(messages).content or "")
-
-    from advisor.cache import MemoryTTLCache
+        r = llm_c.invoke(messages)
+        acc.add_node_c(r)
+        return str(r.content or "")
 
     return AdvisorDeps(
         invoke_llm_a=invoke_a,
@@ -123,6 +145,7 @@ def build_default_deps() -> AdvisorDeps:
         cache=MemoryTTLCache(),
         model_name_a=model_a,
         model_name_c=model_c,
+        token_usage=acc,
     )
 
 
@@ -140,6 +163,9 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
         )
         return failed.model_dump(mode="json")
 
+    if deps.token_usage is not None:
+        deps.token_usage.reset()
+
     try:
         app = build_graph(deps).compile()
         out = app.invoke({"payload": payload})
@@ -151,11 +177,12 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
             error_message=str(e)[:2000],
             retry_count=MAX_LLM_ATTEMPTS,
         )
-        return failed.model_dump(mode="json")
+        base = failed.model_dump(mode="json")
+        return merge_telemetry_into_result(deps, base)
 
     if out.get("final_output"):
-        return out["final_output"]
+        return merge_telemetry_into_result(deps, out["final_output"])
     if out.get("failed_output"):
-        return out["failed_output"]
+        return merge_telemetry_into_result(deps, out["failed_output"])
     _LOG.error("graph_no_terminal", job_id=out.get("job_id"))
     raise RuntimeError("graph finished without final_output or failed_output")

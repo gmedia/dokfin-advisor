@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import BaseMessage
 
+from advisor.llm_usage import TokenUsageAccumulator
+
 if TYPE_CHECKING:
     from tavily import TavilyClient
 
@@ -22,3 +24,4 @@ class AdvisorDeps:
     cache: Any | None = None  # MemoryTTLCache
     model_name_a: str = "gpt-4o-mini"
     model_name_c: str = "gpt-4o"
+    token_usage: TokenUsageAccumulator | None = None

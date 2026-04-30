@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -15,6 +16,13 @@ from nats.js import api
 from nats.js.errors import FetchTimeoutError, NotFoundError
 
 from advisor.graph import AdvisorDeps, build_default_deps, run_advisor
+from advisor.idempotency import (
+    connect_redis,
+    get_cached_result,
+    release_lock,
+    set_cached_result,
+    try_acquire_lock,
+)
 from advisor.logging_setup import get_logger, log_node_timing
 from advisor.schemas.dlq import DlqMessage
 from advisor.schemas.input import JobPayload
@@ -66,6 +74,15 @@ def _serialize_for_nats(obj: Any) -> bytes:
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
 
 
+async def _wait_for_cached_result(redis_client: Any, job_id: str) -> dict[str, Any] | None:
+    for _ in range(25):
+        await asyncio.sleep(0.2)
+        hit = get_cached_result(redis_client, job_id)
+        if hit:
+            return hit
+    return None
+
+
 async def handle_job_message(
     msg: Any,
     *,
@@ -73,6 +90,7 @@ async def handle_job_message(
     deps: AdvisorDeps,
     subject_results: str,
     subject_dlq: str,
+    redis_client: Any | None,
 ) -> None:
     t0 = time.perf_counter()
     try:
@@ -89,50 +107,83 @@ async def handle_job_message(
         job_id_str = ""
 
     structlog.contextvars.bind_contextvars(job_id=job_id_str or None)
+
+    from_cache = False
+    locked = False
+
+    if redis_client and job_id_str:
+        hit = get_cached_result(redis_client, job_id_str)
+        if hit:
+            result = hit
+            from_cache = True
+
+    if not from_cache and redis_client and job_id_str:
+        if not try_acquire_lock(redis_client, job_id_str):
+            hit2 = await _wait_for_cached_result(redis_client, job_id_str)
+            if hit2:
+                result = hit2
+                from_cache = True
+            else:
+                _LOG.warning("idempotency_lock_busy", job_id=job_id_str)
+                await msg.nak()
+                return
+        else:
+            locked = True
+
     try:
-        result = run_advisor(payload, deps)
-    except Exception as e:  # noqa: BLE001
-        _LOG.exception("advisor_unhandled_error", error=str(e))
-        await msg.nak()
-        return
+        if not from_cache:
+            try:
+                result = await asyncio.to_thread(run_advisor, payload, deps)
+            except Exception:
+                _LOG.exception("advisor_unhandled_error", job_id=job_id_str)
+                await msg.nak()
+                return
 
-    elapsed = time.perf_counter() - t0
-    result = attach_processing_time(result, elapsed)
+        elapsed = time.perf_counter() - t0
+        if not from_cache:
+            result = attach_processing_time(result, elapsed)
 
-    pub_timeout = float(_env("NATS_REQUEST_TIMEOUT_S", "30"))
-    try:
-        await js.publish(subject_results, _serialize_for_nats(result), timeout=pub_timeout)
-    except Exception as e:  # noqa: BLE001
-        _LOG.error("publish_results_failed", error=str(e), job_id=job_id_str)
-        await msg.nak()
-        return
-
-    if _result_needs_dlq(result):
-        jp = JobPayload.model_validate(payload)
-
-        dlq = DlqMessage(
-            job_id=jp.job_id,
-            original_payload=payload,
-            error=str(result.get("error_message", ""))[:8000],
-            failed_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            retry_count=int(result.get("retry_count", 0)),
-        )
+        pub_timeout = float(_env("NATS_REQUEST_TIMEOUT_S", "30"))
         try:
-            await js.publish(
-                subject_dlq,
-                _serialize_for_nats(dlq.model_dump(mode="json")),
-                timeout=pub_timeout,
-            )
+            await js.publish(subject_results, _serialize_for_nats(result), timeout=pub_timeout)
         except Exception as e:  # noqa: BLE001
-            _LOG.error("publish_dlq_failed", error=str(e), job_id=job_id_str)
+            _LOG.error("publish_results_failed", error=str(e), job_id=job_id_str)
+            await msg.nak()
+            return
 
-    await msg.ack()
-    log_node_timing(
-        _LOG,
-        job_id=job_id_str or "unknown",
-        node="worker_total",
-        duration_ms=elapsed * 1000,
-    )
+        if redis_client and job_id_str and not from_cache:
+            set_cached_result(redis_client, job_id_str, result)
+
+        if _result_needs_dlq(result) and not from_cache:
+            jp = JobPayload.model_validate(payload)
+
+            dlq = DlqMessage(
+                job_id=jp.job_id,
+                original_payload=payload,
+                error=str(result.get("error_message", ""))[:8000],
+                failed_at=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                retry_count=int(result.get("retry_count", 0)),
+            )
+            try:
+                await js.publish(
+                    subject_dlq,
+                    _serialize_for_nats(dlq.model_dump(mode="json")),
+                    timeout=pub_timeout,
+                )
+            except Exception as e:  # noqa: BLE001
+                _LOG.error("publish_dlq_failed", error=str(e), job_id=job_id_str)
+
+        await msg.ack()
+        log_node_timing(
+            _LOG,
+            job_id=job_id_str or "unknown",
+            node="worker_total",
+            duration_ms=elapsed * 1000,
+            idempotency_hit=from_cache,
+        )
+    finally:
+        if locked and redis_client and job_id_str:
+            release_lock(redis_client, job_id_str)
 
 
 async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
@@ -144,6 +195,11 @@ async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
     durable = _env("NATS_CONSUMER_DURABLE", "dokfin-advisor")
     fetch_batch = int(_env("NATS_FETCH_BATCH", "1"))
     fetch_timeout = float(_env("NATS_FETCH_TIMEOUT_S", "30"))
+    max_conc = max(1, int(_env("ADVISOR_MAX_CONCURRENCY", "1")))
+
+    redis_client = connect_redis()
+    if redis_client is None and _env("ADVISOR_IDEMPOTENCY_ENABLED", "1") == "1":
+        _LOG.info("idempotency_redis_disabled", reason="no_redis_client")
 
     nc = await nats.connect(
         servers=[url],
@@ -162,9 +218,22 @@ async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
         stream=stream_jobs,
         subject=subject_jobs,
         durable=durable,
+        max_concurrency=max_conc,
     )
 
     d = deps if deps is not None else build_default_deps()
+    sem = asyncio.Semaphore(max_conc)
+
+    async def process_one(m: Any) -> None:
+        async with sem:
+            await handle_job_message(
+                m,
+                js=js,
+                deps=d,
+                subject_results=subject_results,
+                subject_dlq=subject_dlq,
+                redis_client=redis_client,
+            )
 
     try:
         while True:
@@ -172,19 +241,10 @@ async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
                 msgs = await sub.fetch(fetch_batch, timeout=fetch_timeout)
             except FetchTimeoutError:
                 continue
-            for m in msgs:
-                await handle_job_message(
-                    m,
-                    js=js,
-                    deps=d,
-                    subject_results=subject_results,
-                    subject_dlq=subject_dlq,
-                )
+            await asyncio.gather(*(process_one(m) for m in msgs))
     finally:
         await nc.close()
 
 
 def run_nats_worker_sync(*, deps: AdvisorDeps | None = None) -> None:
-    import asyncio
-
     asyncio.run(run_nats_worker(deps=deps))
