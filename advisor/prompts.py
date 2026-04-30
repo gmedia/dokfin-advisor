@@ -37,6 +37,10 @@ Contoh kata kunci yang SALAH:
 
 Output HARUS berupa JSON valid, tidak ada teks lain di luar JSON:
 
+Field `dimensi_terburuk` WAJIB salah satu slug huruf kecil persis:
+likuiditas | profitabilitas | efisiensi | solvabilitas | sdm | kepatuhan
+(bukan "Profitabilitas" atau judul lain.)
+
 {
   "indikator_kritis": ["KES_02", "EFI_04"],
   "dimensi_terburuk": "likuiditas",
@@ -138,6 +142,21 @@ Label skor (sudah dihitung, tinggal pakai):
 - 4.0 – 5.9  → "Perlu Perhatian"
 - 0.0 – 3.9  → "Kritis"
 
+PENTING — Field `status` per dimensi di JSON keluaran **akan ditimpa sistem** dari skor numerik
+(sesuai pita skor di atas). Tulis narasi dan saran yang selaras dengan **angka skor per dimensi**
+yang sudah diberikan di prompt — jangan menyebut "KRITIS" di narasi jika skor dimensi sebenarnya
+di zona cukup sehat / perlu perhatian.
+
+Jika profil tidak menyertakan skor keseluruhan periode sebelumnya, jangan berpura-pura ada
+perbandingan kuantitatif antar periode — sistem akan mengunci `trend` dan `vs_periode_lalu`.
+
+Jika dua indikator atau dua dimensi tampak bertentangan (misalnya biaya produksi naik tapi stok
+tidak menumpuk), jelaskan kemungkinan penyebab dalam bahasa awam — contoh: kenaikan harga dari
+supplier, bukan kesalahan pembelian berlebihan.
+
+Untuk dimensi SDM: saran harus mengaitkan angka konkret dari data (misalnya selisih ke target
+penjualan, porsi gaji) jika tersedia, bukan hanya ide generik kompetisi internal.
+
 ============================
 PANDUAN REKOMENDASI PRIORITAS
 ============================
@@ -178,6 +197,9 @@ OUTPUT SCHEMA — WAJIB DIIKUTI PERSIS
 ============================
 
 Output HARUS berupa JSON valid. Tidak ada teks di luar JSON, tidak ada markdown code block.
+
+Bila tidak ada skor periode sebelumnya dari sistem, isi skor_keseluruhan dengan
+"trend": "tidak_tersedia" dan "vs_periode_lalu": null (bukan angka 0 semu).
 
 {
   "job_id": "{job_id}",
@@ -283,10 +305,16 @@ def build_node_c_messages(
         ensure_ascii=False,
         indent=2,
     )
+    prev_skor_line = ""
+    if p.skor_keseluruhan_periode_sebelumnya is not None:
+        prev_skor_line = (
+            f"\n- Skor keseluruhan periode sebelumnya (untuk tren): "
+            f"{p.skor_keseluruhan_periode_sebelumnya:.1f} / 10"
+        )
     business_block = f"""- Jenis usaha: {p.industri} ({p.sub_industri})
 - Kota: {p.kota}
 - Jumlah karyawan: {p.jumlah_karyawan} orang
-- Periode laporan: {p.periode_analisis}
+- Periode laporan: {p.periode_analisis}{prev_skor_line}
 {disclaimer}"""
     seed_block = ""
     if konteks_pasar_seed:

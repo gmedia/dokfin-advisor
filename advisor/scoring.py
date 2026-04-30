@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from advisor.schemas.input import IndikatorStatus
+
 STATUS_POIN: dict[str, int | None] = {
     "SEHAT": 10,
     "ON_TRACK": 8,
@@ -56,6 +58,33 @@ def get_label_skor(skor: float) -> str:
     if skor >= 4.0:
         return "Perlu Perhatian"
     return "Kritis"
+
+
+def status_agregat_dimensi_dari_skor(skor: float) -> IndikatorStatus:
+    """Status blok dimensi di hasil publik dari skor agregat (ambang PRD 7.4, enum output)."""
+    s = round(float(skor) * 10) / 10
+    if s >= 8.0:
+        return IndikatorStatus.SEHAT
+    if s >= 4.0:
+        return IndikatorStatus.PERLU_PERHATIAN
+    return IndikatorStatus.KRITIS
+
+
+def trend_dan_delta_skor_keseluruhan(
+    skor_sekarang: float,
+    skor_periode_sebelumnya: float | None,
+    *,
+    epsilon: float = 0.05,
+) -> tuple[str, float | None]:
+    """Trend dan selisih skor keseluruhan; tanpa data periode sebelumnya → tidak_tersedia / None."""
+    if skor_periode_sebelumnya is None:
+        return "tidak_tersedia", None
+    delta = round(float(skor_sekarang) - float(skor_periode_sebelumnya), 2)
+    if delta > epsilon:
+        return "naik", delta
+    if delta < -epsilon:
+        return "turun", delta
+    return "stabil", delta
 
 
 def skor_from_payload_dimensi(dimensi: dict[str, dict[str, Any]]) -> dict[str, float]:

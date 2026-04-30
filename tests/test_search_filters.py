@@ -45,6 +45,36 @@ def test_filter_drops_old_and_short() -> None:
     assert "c" in out[0]["url"]
 
 
+def test_filter_drop_undated_excludes_when_enabled() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://x/oldstyle",
+            "title": "u",
+            "content": "word " * 30,
+            "score": 0.9,
+        },
+        {
+            "url": "https://x/dated",
+            "title": "d",
+            "content": "word " * 30,
+            "score": 0.5,
+            "published_date": ref.isoformat(),
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        drop_undated=True,
+    )
+    assert len(out) == 1
+    assert "dated" in out[0]["url"]
+
+
 def test_filter_max_three_by_score() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()

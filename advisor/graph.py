@@ -13,7 +13,8 @@ from pydantic import ValidationError
 
 from advisor.cost_estimate import estimate_cost_idr
 from advisor.deps import AdvisorDeps
-from advisor.logging_setup import get_logger
+from advisor.llm_response_text import text_from_message_content
+from advisor.logging_setup import bind_job_context, configure_logging, get_logger
 from advisor.nodes.contextualize import make_contextualize_node
 from advisor.nodes.search import run_search
 from advisor.nodes.synthesize import make_synthesize_node
@@ -35,7 +36,13 @@ def merge_telemetry_into_result(deps: AdvisorDeps, result: dict[str, Any]) -> di
     tu = acc.to_token_usage()
     if tu:
         out["token_usage"] = tu.model_dump(mode="json")
-    cost = estimate_cost_idr(acc, model_a=deps.model_name_a, model_c=deps.model_name_c)
+    prov = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
+    cost = estimate_cost_idr(
+        acc,
+        model_a=deps.model_name_a,
+        model_c=deps.model_name_c,
+        llm_provider=prov,
+    )
     if cost is not None:
         out["estimated_cost_idr"] = cost
     return out
@@ -141,12 +148,12 @@ def _build_openai_deps() -> AdvisorDeps:
     def invoke_a(messages: list) -> str:
         r = llm_a.invoke(messages)
         acc.add_node_a(r)
-        return str(r.content or "")
+        return text_from_message_content(r.content)
 
     def invoke_c(messages: list) -> str:
         r = llm_c.invoke(messages)
         acc.add_node_c(r)
-        return str(r.content or "")
+        return text_from_message_content(r.content)
 
     return AdvisorDeps(
         invoke_llm_a=invoke_a,
@@ -170,19 +177,30 @@ def _build_google_genai_deps() -> AdvisorDeps:
     model_a = os.environ.get("GOOGLE_MODEL_A", "gemini-2.0-flash")
     model_c = os.environ.get("GOOGLE_MODEL_C", "gemini-2.0-flash")
     timeout_s = _llm_timeout_s(google=True)
-    llm_a = ChatGoogleGenerativeAI(model=model_a, temperature=0, timeout=timeout_s)
-    llm_c = ChatGoogleGenerativeAI(model=model_c, temperature=0.2, timeout=timeout_s)
+    json_mime = "application/json"
+    llm_a = ChatGoogleGenerativeAI(
+        model=model_a,
+        temperature=0,
+        timeout=timeout_s,
+        response_mime_type=json_mime,
+    )
+    llm_c = ChatGoogleGenerativeAI(
+        model=model_c,
+        temperature=0.2,
+        timeout=timeout_s,
+        response_mime_type=json_mime,
+    )
     acc = TokenUsageAccumulator()
 
     def invoke_a(messages: list) -> str:
         r = llm_a.invoke(messages)
         acc.add_node_a(r)
-        return str(r.content or "")
+        return text_from_message_content(r.content)
 
     def invoke_c(messages: list) -> str:
         r = llm_c.invoke(messages)
         acc.add_node_c(r)
-        return str(r.content or "")
+        return text_from_message_content(r.content)
 
     return AdvisorDeps(
         invoke_llm_a=invoke_a,
@@ -198,6 +216,9 @@ def _build_google_genai_deps() -> AdvisorDeps:
 def build_default_deps() -> AdvisorDeps:
     """Deps produksi: OpenAI (default) atau Gemini (`LLM_PROVIDER=google`)."""
 
+    from dotenv import load_dotenv
+
+    load_dotenv()
     provider = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
     if provider in ("google", "gemini", "genai"):
         return _build_google_genai_deps()
@@ -206,8 +227,9 @@ def build_default_deps() -> AdvisorDeps:
 
 def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
     """Jalankan graph; return dict DONE atau FAILED (JSON-friendly)."""
+    configure_logging()
     try:
-        JobPayload.model_validate(payload)
+        validated = JobPayload.model_validate(payload)
     except ValidationError as e:
         failed = AdvisorResultFailed(
             job_id=_job_id_for_failed_response(payload),
@@ -217,6 +239,8 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
             retry_count=0,
         )
         return failed.model_dump(mode="json")
+
+    bind_job_context(job_id=str(validated.job_id))
 
     if deps.token_usage is not None:
         deps.token_usage.reset()

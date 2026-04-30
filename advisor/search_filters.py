@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -58,6 +59,10 @@ def _hostname_in_trust_list(host: str, trusted: set[str]) -> bool:
     return any(host == d or host.endswith("." + d) for d in trusted)
 
 
+def _env_drop_undated() -> bool:
+    return os.environ.get("TAVILY_DROP_UNDATED", "0").strip().lower() in ("1", "true", "yes")
+
+
 def filter_tavily_results(
     results: list[dict[str, Any]],
     *,
@@ -66,8 +71,11 @@ def filter_tavily_results(
     max_keep: int = 3,
     min_words: int = 100,
     max_age: timedelta = timedelta(days=183),
+    drop_undated: bool | None = None,
 ) -> list[dict[str, Any]]:
     """Buang hasil terlalu tua, pendek, atau di luar whitelist; urut score; ambil max_keep."""
+    if drop_undated is None:
+        drop_undated = _env_drop_undated()
     cutoff = reference_date - max_age
     scored: list[tuple[float, dict[str, Any]]] = []
 
@@ -80,6 +88,8 @@ def filter_tavily_results(
         if _word_count(content) < min_words:
             continue
         pub = _parse_published_date(_published_raw(r))
+        if drop_undated and pub is None:
+            continue
         if pub is not None and pub < cutoff:
             continue
         score = float(r.get("score") or 0.0)

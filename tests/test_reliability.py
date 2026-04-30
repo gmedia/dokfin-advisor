@@ -135,6 +135,8 @@ def test_tavily_raises_still_done_with_empty_konteks() -> None:
     assert out["status"] == "DONE"
     validated = AdvisorResultDone.model_validate(out)
     assert validated.konteks_pasar == []
+    assert validated.skor_keseluruhan.trend == "tidak_tersedia"
+    assert validated.skor_keseluruhan.vs_periode_lalu is None
 
 
 def test_payload_invalid_returns_failed() -> None:

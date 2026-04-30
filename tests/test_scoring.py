@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from advisor.schemas.input import IndikatorStatus
 from advisor.scoring import (
     BOBOT_DIMENSI,
     get_label_skor,
     hitung_skor_dimensi,
     hitung_skor_keseluruhan,
     skor_from_payload_dimensi,
+    status_agregat_dimensi_dari_skor,
+    trend_dan_delta_skor_keseluruhan,
 )
 
 
@@ -44,6 +47,21 @@ def test_get_label_skor_buckets() -> None:
     assert get_label_skor(6.0) == "Cukup Sehat"
     assert get_label_skor(4.0) == "Perlu Perhatian"
     assert get_label_skor(3.9) == "Kritis"
+
+
+def test_status_agregat_dimensi_dari_skor_buckets() -> None:
+    assert status_agregat_dimensi_dari_skor(8.0) == IndikatorStatus.SEHAT
+    assert status_agregat_dimensi_dari_skor(7.9) == IndikatorStatus.PERLU_PERHATIAN
+    assert status_agregat_dimensi_dari_skor(4.0) == IndikatorStatus.PERLU_PERHATIAN
+    assert status_agregat_dimensi_dari_skor(3.9) == IndikatorStatus.KRITIS
+
+
+def test_trend_dan_delta_skor_keseluruhan() -> None:
+    assert trend_dan_delta_skor_keseluruhan(7.0, None) == ("tidak_tersedia", None)
+    assert trend_dan_delta_skor_keseluruhan(7.0, 6.0)[0] == "naik"
+    assert trend_dan_delta_skor_keseluruhan(6.0, 7.0)[0] == "turun"
+    t, d = trend_dan_delta_skor_keseluruhan(6.0, 6.02, epsilon=0.05)
+    assert t == "stabil" and d == -0.02
 
 
 def test_skor_from_payload_dimensi() -> None:

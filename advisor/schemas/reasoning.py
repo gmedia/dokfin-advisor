@@ -8,6 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from advisor.keyword_safety import sanitize_search_keywords
 
+_DIMENSI_TERBURUK: frozenset[str] = frozenset(
+    ("likuiditas", "profitabilitas", "efisiensi", "solvabilitas", "sdm", "kepatuhan")
+)
+
 
 class ContextualizeResult(BaseModel):
     """JSON shape from Node A after validation + keyword sanitization."""
@@ -26,6 +30,19 @@ class ContextualizeResult(BaseModel):
     search_keywords: list[str] = Field(..., min_length=1, max_length=3)
     ada_perishable_kritis: bool = False
     flag_data_tidak_lengkap: bool = False
+
+    @field_validator("dimensi_terburuk", mode="before")
+    @classmethod
+    def normalize_dimensi_terburuk(cls, v: object) -> str:
+        """Gemini/LLM kadang mengembalikan kapitalisasi judul; wajib slug lowercase PRD."""
+        if not isinstance(v, str):
+            msg = "dimensi_terburuk must be a string"
+            raise TypeError(msg)
+        key = v.strip().lower()
+        if key not in _DIMENSI_TERBURUK:
+            msg = f"dimensi_terburuk must be one of {sorted(_DIMENSI_TERBURUK)}, got {v!r}"
+            raise ValueError(msg)
+        return key
 
     @field_validator("indikator_kritis", mode="before")
     @classmethod

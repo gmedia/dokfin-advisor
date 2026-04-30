@@ -55,6 +55,29 @@ def test_merge_telemetry_into_done() -> None:
     assert merged["token_usage"]["total"] == 43
 
 
+def test_estimate_cost_idr_google_when_env_set() -> None:
+    acc = TokenUsageAccumulator()
+    acc.node_a_input = 1_000_000
+    acc.node_a_output = 0
+    acc.node_c_input = 0
+    acc.node_c_output = 0
+    with patch.dict(
+        os.environ,
+        {
+            "GOOGLE_PRICE_INPUT_PER_M_IDR": "4000",
+            "GOOGLE_PRICE_OUTPUT_PER_M_IDR": "12000",
+        },
+        clear=False,
+    ):
+        c = estimate_cost_idr(
+            acc,
+            model_a="gemini-2.0-flash",
+            model_c="gemini-2.0-flash",
+            llm_provider="google",
+        )
+    assert c == 4000.0
+
+
 def test_estimate_cost_idr_when_env_set() -> None:
     acc = TokenUsageAccumulator()
     acc.node_a_input = 1_000_000

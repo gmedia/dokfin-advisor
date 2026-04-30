@@ -17,22 +17,40 @@ def _fenv(name: str) -> float | None:
         return None
 
 
+def _sanitized_model_key(model: str) -> str:
+    return model.replace("-", "_").replace(".", "_")
+
+
+def _openai_rates(model: str) -> tuple[float | None, float | None]:
+    key = _sanitized_model_key(model)
+    inp = _fenv(f"OPENAI_PRICE_{key}_INPUT_PER_M_IDR")
+    out = _fenv(f"OPENAI_PRICE_{key}_OUTPUT_PER_M_IDR")
+    if inp is not None and out is not None:
+        return inp, out
+    return _fenv("OPENAI_PRICE_INPUT_PER_M_IDR"), _fenv("OPENAI_PRICE_OUTPUT_PER_M_IDR")
+
+
+def _google_rates(model: str) -> tuple[float | None, float | None]:
+    key = _sanitized_model_key(model)
+    inp = _fenv(f"GOOGLE_PRICE_{key}_INPUT_PER_M_IDR")
+    out = _fenv(f"GOOGLE_PRICE_{key}_OUTPUT_PER_M_IDR")
+    if inp is not None and out is not None:
+        return inp, out
+    return _fenv("GOOGLE_PRICE_INPUT_PER_M_IDR"), _fenv("GOOGLE_PRICE_OUTPUT_PER_M_IDR")
+
+
 def estimate_cost_idr(
     acc: TokenUsageAccumulator,
     *,
     model_a: str,
     model_c: str,
+    llm_provider: str | None = None,
 ) -> float | None:
     """IDR per 1M tokens. Model-specific keys optional; fallback to generic env."""
 
-    # Per-model (sanitized): gpt-4o-mini -> gpt_4o_mini
-    def rates_for(model: str) -> tuple[float | None, float | None]:
-        key = model.replace("-", "_").replace(".", "_")
-        inp = _fenv(f"OPENAI_PRICE_{key}_INPUT_PER_M_IDR")
-        out = _fenv(f"OPENAI_PRICE_{key}_OUTPUT_PER_M_IDR")
-        if inp is not None and out is not None:
-            return inp, out
-        return _fenv("OPENAI_PRICE_INPUT_PER_M_IDR"), _fenv("OPENAI_PRICE_OUTPUT_PER_M_IDR")
+    prov = (llm_provider or os.environ.get("LLM_PROVIDER", "openai")).strip().lower()
+    use_google = prov in ("google", "gemini", "genai")
+    rates_for = _google_rates if use_google else _openai_rates
 
     ain, aout = rates_for(model_a)
     cin, cout = rates_for(model_c)

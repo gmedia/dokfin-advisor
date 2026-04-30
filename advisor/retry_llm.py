@@ -21,5 +21,6 @@ def call_with_json_retries[T](fn: Callable[[], T], *, max_attempts: int = MAX_LL
             continue
     msg = f"exhausted after {max_attempts} attempts"
     if last_exc:
-        raise RuntimeError(msg) from last_exc
+        detail = f"{msg}: {last_exc}"
+        raise RuntimeError(detail) from last_exc
     raise RuntimeError(msg)

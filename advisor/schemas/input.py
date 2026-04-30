@@ -58,6 +58,7 @@ class ProfilBisnis(BaseModel):
     periode_bulan: int
     periode_tahun: int
     kelengkapan_data_persen: float
+    skor_keseluruhan_periode_sebelumnya: float | None = None
 
 
 class JobPayload(BaseModel):

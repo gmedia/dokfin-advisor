@@ -120,7 +120,9 @@ def test_graph_happy_path_mocked() -> None:
     assert out["job_id"] == job_id
     validated = AdvisorResultDone.model_validate(out)
     assert validated.skor_keseluruhan.nilai > 0
-    assert validated.dimensi.likuiditas.status.value == "KRITIS"
+    assert validated.dimensi.likuiditas.status.value == "PERLU_PERHATIAN"
+    assert validated.skor_keseluruhan.trend == "tidak_tersedia"
+    assert validated.skor_keseluruhan.vs_periode_lalu is None
 
 
 def test_node_a_json_retry_then_ok() -> None:

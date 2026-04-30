@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from advisor.schemas.input import IndikatorStatus
+from advisor.scoring import status_agregat_dimensi_dari_skor
 
 
 class ErrorCode(StrEnum):
@@ -32,13 +33,16 @@ class TokenUsage(BaseModel):
     total: int | None = None
 
 
+SkorKeseluruhanTrend = Literal["naik", "turun", "stabil", "datar", "tidak_tersedia"]
+
+
 class SkorKeseluruhanOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     nilai: float
     label: str
-    trend: str
-    vs_periode_lalu: float
+    trend: SkorKeseluruhanTrend
+    vs_periode_lalu: float | None
 
 
 class RingkasanEksekutifOut(BaseModel):
@@ -56,6 +60,17 @@ class DimensiSatuOut(BaseModel):
     status: IndikatorStatus
     narasi: str
     saran: list[str]
+
+    @model_validator(mode="after")
+    def status_selaras_skor(self) -> Self:
+        expected = status_agregat_dimensi_dari_skor(self.skor)
+        if self.status != expected:
+            msg = (
+                f"status {self.status} tidak selaras dengan skor {self.skor} "
+                f"(harus {expected.value})"
+            )
+            raise ValueError(msg)
+        return self
 
 
 class DimensiReportOut(BaseModel):
