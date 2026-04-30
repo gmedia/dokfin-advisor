@@ -15,6 +15,7 @@ from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_fixe
 
 from advisor.cache import MemoryTTLCache, cache_key_for_keyword
 from advisor.logging_setup import get_logger, log_node_timing
+from advisor.schemas.input import JobPayload
 from advisor.search_filters import (
     filter_tavily_results,
     hostname_from_url,
@@ -29,9 +30,9 @@ _default_cache = MemoryTTLCache()
 
 def _policy_salt(domains: list[str] | None) -> str:
     if not domains:
-        return "open"
+        return "open:v2"
     joined = ",".join(sorted(domains))
-    return hashlib.md5(joined.encode("utf-8")).hexdigest()[:16]
+    return hashlib.md5((joined + "|v2").encode("utf-8")).hexdigest()[:16]
 
 
 def _tavily_retryable(exc: BaseException) -> bool:
@@ -125,6 +126,155 @@ def _seeds_from_results(
     return seeds
 
 
+def _normalize_text(v: object) -> str:
+    return str(v or "").strip().lower()
+
+
+def _contains_any(haystack: str, needles: tuple[str, ...]) -> bool:
+    return any(n in haystack for n in needles)
+
+
+def _relevance_score_for_business(result: dict[str, Any], *, payload: JobPayload) -> float:
+    """Deterministic relevance heuristic; higher is more relevant."""
+    text = (
+        f"{result.get('title') or ''} {result.get('content') or ''} {result.get('url') or ''}"
+    ).lower()
+
+    # Hard negative topics that often show up on trusted domains but irrelevant for F&B UMKM.
+    hard_blacklist = (
+        "gaikindo",
+        "otomotif",
+        "mobil",
+        "kendaraan",
+        "rokok",
+        "tembakau",
+        "sigaret",
+        "logistik",
+        "ekspor",
+        "impor",
+        "pandemi",
+        "covid",
+        "giiass",
+    )
+    if _contains_any(text, hard_blacklist):
+        return -999.0
+
+    industri = _normalize_text(payload.profil_bisnis.industri)
+    sub = _normalize_text(payload.profil_bisnis.sub_industri)
+    kota = _normalize_text(payload.profil_bisnis.kota)
+
+    # Normalize common alias (Jogja / Yogyakarta).
+    kota_aliases: tuple[str, ...] = (kota,) if kota else tuple()
+    if kota in ("yogyakarta", "kota yogyakarta", "d.i. yogyakarta", "diy"):
+        kota_aliases = ("yogyakarta", "jogja", "diy")
+    if kota in ("jogja",):
+        kota_aliases = ("yogyakarta", "jogja", "diy")
+
+    score = 0.0
+    # Core F&B terms
+    fnb_terms = ("f&b", "kuliner", "restoran", "rumah makan", "kafe", "cafe", "makanan", "minuman")
+    if _contains_any(text, fnb_terms):
+        score += 2.0
+    # UMKM / demand terms
+    demand_terms = (
+        "umkm",
+        "konsumen",
+        "penjualan",
+        "permintaan",
+        "daya beli",
+        "pesan antar",
+        "delivery",
+    )
+    if _contains_any(text, demand_terms):
+        score += 1.0
+    # Industry/sub-industry mentions (if present)
+    if industri and industri in text:
+        score += 1.0
+    if sub and sub in text:
+        score += 1.0
+    # Location mention
+    if kota_aliases and any(k and k in text for k in kota_aliases):
+        score += 1.0
+
+    return score
+
+
+def _rank_and_filter_by_relevance(
+    results: list[dict[str, Any]],
+    *,
+    payload: JobPayload,
+    min_relevance: float,
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r in results:
+        rel = _relevance_score_for_business(r, payload=payload)
+        if rel < 0:
+            continue
+        if rel < min_relevance:
+            continue
+        r2 = dict(r)
+        r2["_relevance"] = rel
+        # Boost Tavily ranking lightly (keep stable; avoid overpowering original score).
+        base = float(r2.get("score") or 0.0)
+        r2["score"] = base + (0.15 * rel)
+        out.append(r2)
+    return out
+
+
+def _pick_global_results(
+    candidates: list[dict[str, Any]],
+    *,
+    min_total: int,
+    max_total: int,
+) -> list[dict[str, Any]]:
+    min_total = max(0, min_total)
+    max_total = max(0, max_total)
+    if max_total <= 0:
+        return []
+    if not candidates:
+        return []
+
+    def _sort_key(r: dict[str, Any]) -> tuple[float, float]:
+        return (float(r.get("score") or 0.0), float(r.get("_relevance") or 0.0))
+
+    ranked = sorted(candidates, key=_sort_key, reverse=True)
+
+    picked: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    seen_roots: set[str] = set()
+
+    def _try_pick(r: dict[str, Any], *, enforce_diversity: bool) -> bool:
+        url = str(r.get("url") or "")
+        if url and url in seen_urls:
+            return False
+        host = hostname_from_url(url)
+        root = root_domain_from_host(host) or host
+        if enforce_diversity and root and root in seen_roots:
+            return False
+        if url:
+            seen_urls.add(url)
+        if root:
+            seen_roots.add(root)
+        picked.append(r)
+        return True
+
+    # Pass 1: diversity-first
+    for r in ranked:
+        if len(picked) >= max_total:
+            break
+        _try_pick(r, enforce_diversity=True)
+
+    # Pass 2: fill remainder regardless diversity
+    if len(picked) < max_total:
+        for r in ranked:
+            if len(picked) >= max_total:
+                break
+            _try_pick(r, enforce_diversity=False)
+
+    # If we still cannot reach min_total, return what we have (no error).
+    return picked[:max_total]
+
+
 def _pick_results_with_ladders(
     results: list[dict[str, Any]],
     *,
@@ -202,6 +352,7 @@ def run_search(
 ) -> dict[str, Any]:
     """Fetch market context from Tavily for sanitized keywords in `reasoning`."""
     job_id = str(state.get("job_id", ""))
+    payload = JobPayload.model_validate(state.get("payload") or {})
     reasoning = state.get("reasoning") or {}
     keywords = reasoning.get("search_keywords") or []
     cache = cache or _default_cache
@@ -213,9 +364,8 @@ def run_search(
     ref_date = ref_dt.date()
 
     t0 = time.perf_counter()
-    blocks: list[str] = []
-    all_seeds: list[dict[str, Any]] = []
-    seen_keys: set[tuple[str, str]] = set()
+    per_kw_answer: dict[str, str] = {}
+    all_candidates: list[dict[str, Any]] = []
     client = tavily_client
     if client is None and os.environ.get("TAVILY_API_KEY"):
         try:
@@ -227,19 +377,17 @@ def run_search(
     for kw in keywords:
         ck = cache_key_for_keyword(kw, policy_salt=salt)
         cached = cache.get(ck)
-        if isinstance(cached, dict) and "market_block" in cached:
-            blocks.append(str(cached["market_block"]))
-            for s in cached.get("seed") or []:
-                if isinstance(s, dict):
-                    dom = str(s.get("sumber") or "")
-                    key = (dom, str(s.get("topik") or "")[:80])
-                    if key in seen_keys:
-                        continue
-                    seen_keys.add(key)
-                    all_seeds.append(dict(s))
+        if isinstance(cached, dict) and "picked_results" in cached:
+            answer = str(cached.get("answer") or "")
+            picked_results = cached.get("picked_results") or []
+            if isinstance(picked_results, list):
+                per_kw_answer[kw] = answer
+                for r in [dict(x) for x in picked_results if isinstance(x, dict)]:
+                    r["_kw"] = kw
+                    all_candidates.append(r)
             continue
         if isinstance(cached, str):
-            blocks.append(cached)
+            per_kw_answer[kw] = ""
             continue
         if client is None:
             continue
@@ -251,10 +399,18 @@ def run_search(
             primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
             fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
             fallback2_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK2", "183"))
-            max_keep = 3
-            min_keep = int(os.environ.get("TAVILY_MIN_KEEP", "2"))
-            filtered = _pick_results_with_ladders(
+            min_relevance = float(os.environ.get("TAVILY_MIN_RELEVANCE", "1.0"))
+            rel_filtered = _rank_and_filter_by_relevance(
                 results,
+                payload=payload,
+                min_relevance=min_relevance,
+            )
+
+            max_keep = 3
+            # Per-keyword minimum keep: default 1 (global min/max will handle overall coverage).
+            min_keep = int(os.environ.get("TAVILY_MIN_KEEP", "1"))
+            filtered = _pick_results_with_ladders(
+                rel_filtered,
                 trusted_domains=trusted,
                 reference_date=ref_date,
                 min_words=min_words,
@@ -262,27 +418,43 @@ def run_search(
                 min_keep=min_keep,
                 ladder_days=[primary_days, fallback_days, fallback2_days],
             )
-            access_date = ref_date.isoformat()
-            block = _format_market_block(kw, answer, filtered)
-            seeds = _seeds_from_results(
-                filtered,
-                access_date,
-                reference_date=ref_dt,
-                primary_days=primary_days,
-            )
-            cache.set(ck, {"market_block": block, "seed": seeds})
-            blocks.append(block)
-            for s in seeds:
-                dom = str(s.get("sumber") or "")
-                key = (dom, str(s.get("topik") or "")[:80])
-                if key in seen_keys:
-                    continue
-                seen_keys.add(key)
-                all_seeds.append(s)
+            per_kw_answer[kw] = answer
+            # Attach context for global picking + later seed rendering.
+            picked_results: list[dict[str, Any]] = []
+            for r in filtered:
+                r2 = dict(r)
+                r2["_kw"] = kw
+                picked_results.append(r2)
+                all_candidates.append(r2)
+            cache.set(ck, {"answer": answer, "picked_results": picked_results})
         except Exception as e:  # noqa: BLE001
             _LOG.warning("tavily_search_failed", job_id=job_id, keyword=kw, error=str(e))
 
+    min_total = int(os.environ.get("TAVILY_KONTEKS_PASAR_MIN_TOTAL", "2"))
+    max_total = int(os.environ.get("TAVILY_KONTEKS_PASAR_MAX_TOTAL", "3"))
+    picked_global = _pick_global_results(
+        all_candidates,
+        min_total=min_total,
+        max_total=max_total,
+    )
+
+    by_kw: dict[str, list[dict[str, Any]]] = {}
+    for r in picked_global:
+        kw = str(r.get("_kw") or "")
+        by_kw.setdefault(kw, []).append(r)
+
+    blocks: list[str] = []
+    for kw, rs in by_kw.items():
+        blocks.append(_format_market_block(kw, per_kw_answer.get(kw, ""), rs))
     market_context = "\n\n".join(blocks) if blocks else ""
+
+    access_date = ref_date.isoformat()
+    all_seeds = _seeds_from_results(
+        picked_global,
+        access_date,
+        reference_date=ref_dt,
+        primary_days=int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30")),
+    )
     elapsed_ms = (time.perf_counter() - t0) * 1000
     log_node_timing(_LOG, job_id=job_id, node="B", duration_ms=elapsed_ms, keywords=len(keywords))
 

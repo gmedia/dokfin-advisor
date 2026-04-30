@@ -18,7 +18,7 @@ def test_filter_drops_old_and_short() -> None:
         {
             "url": "https://bi.go.id/a",
             "title": "A",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
             "published_date": old,
         },
@@ -31,7 +31,7 @@ def test_filter_drops_old_and_short() -> None:
         {
             "url": "https://bi.go.id/c",
             "title": "C",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.7,
             "published_date": ref.isoformat(),
         },
@@ -54,13 +54,13 @@ def test_filter_drop_undated_excludes_when_enabled() -> None:
         {
             "url": "https://x/oldstyle",
             "title": "u",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
         },
         {
             "url": "https://x/dated",
             "title": "d",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.5,
             "published_date": ref.isoformat(),
         },
@@ -77,6 +77,74 @@ def test_filter_drop_undated_excludes_when_enabled() -> None:
     assert "dated" in out[0]["url"]
 
 
+def test_filter_drops_pdf_results() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://ojk.go.id/report.pdf",
+            "title": "Laporan X",
+            "content": "word " * 200,
+            "score": 0.9,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://kemenkeu.go.id/ok",
+            "title": "[PDF] KEM PPKF 2026",
+            "content": "word " * 200,
+            "score": 0.8,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://kontan.co.id/read/20260430/ok",
+            "title": "Berita UMKM F&B",
+            "content": "word " * 200,
+            "score": 0.1,
+            "published_date": ref.isoformat(),
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+    )
+    assert len(out) == 1
+    assert "kontan.co.id" in out[0]["url"]
+
+
+def test_filter_drops_toc_like_content() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    toc = "\n".join([f"Tabel {i} ..." for i in range(1, 80)])
+    results = [
+        {
+            "url": "https://x/1",
+            "title": "Daftar isi - Laporan Bulanan",
+            "content": toc,
+            "score": 0.9,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://x/2",
+            "title": "Narasi konsumsi F&B Yogyakarta 2026",
+            "content": "Ini narasi panjang. " * 50,
+            "score": 0.1,
+            "published_date": ref.isoformat(),
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+    )
+    assert len(out) == 1
+    assert out[0]["url"].endswith("/2")
+
+
 def test_filter_rejects_subdomain_when_allow_subdomains_disabled() -> None:
     ref = date(2026, 4, 30)
     trusted = {"kompas.com"}
@@ -84,14 +152,14 @@ def test_filter_rejects_subdomain_when_allow_subdomains_disabled() -> None:
         {
             "url": "https://cahaya.kompas.com/x",
             "title": "X",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
             "published_date": ref.isoformat(),
         },
         {
             "url": "https://kompas.com/y",
             "title": "Y",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.1,
             "published_date": ref.isoformat(),
         },
@@ -116,7 +184,7 @@ def test_filter_two_pass_example_primary_empty_then_fallback_hits() -> None:
         {
             "url": "https://x/older",
             "title": "Old",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.5,
             "published_date": older,
         }
@@ -151,13 +219,13 @@ def test_filter_parses_url_date_and_drops_old_when_metadata_missing() -> None:
         {
             "url": "https://semarang.bisnis.com/read/20250929/536/1915476/foo",
             "title": "Old",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
         },
         {
             "url": "https://kontan.co.id/read/20260410/123/ok",
             "title": "New",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.1,
         },
     ]
@@ -182,21 +250,21 @@ def test_filter_prefers_diverse_root_domains() -> None:
         {
             "url": "https://semarang.bisnis.com/read/20260410/aaa/a",
             "title": "A",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.95,
             "published_date": ref.isoformat(),
         },
         {
             "url": "https://investasi.bisnis.com/read/20260411/bbb/b",
             "title": "B",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
             "published_date": ref.isoformat(),
         },
         {
             "url": "https://kontan.co.id/read/20260409/ccc/c",
             "title": "C",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.2,
             "published_date": ref.isoformat(),
         },
@@ -217,10 +285,10 @@ def test_filter_max_three_by_score() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()
     results = [
-        {"url": "https://x/1", "title": "a", "content": "w " * 50, "score": 0.1},
-        {"url": "https://x/2", "title": "b", "content": "w " * 50, "score": 0.9},
-        {"url": "https://x/3", "title": "c", "content": "w " * 50, "score": 0.5},
-        {"url": "https://x/4", "title": "d", "content": "w " * 50, "score": 0.8},
+        {"url": "https://x/1", "title": "a", "content": "w " * 200, "score": 0.1},
+        {"url": "https://x/2", "title": "b", "content": "w " * 200, "score": 0.9},
+        {"url": "https://x/3", "title": "c", "content": "w " * 200, "score": 0.5},
+        {"url": "https://x/4", "title": "d", "content": "w " * 200, "score": 0.8},
     ]
     out = filter_tavily_results(
         results,
@@ -331,14 +399,14 @@ def test_pick_results_tops_up_to_min_keep_across_ladders() -> None:
         {
             "url": "https://kontan.co.id/read/20260425/a/a",
             "title": "New",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
             "published_date": "2026-04-25",
         },
         {
             "url": "https://kompas.com/read/20260112/b/b",
             "title": "Old",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.8,
             "published_date": "2026-01-12",
         },
@@ -365,14 +433,14 @@ def test_pick_results_allows_same_root_domain_as_last_resort() -> None:
         {
             "url": "https://semarang.bisnis.com/read/20260425/a/a",
             "title": "A",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.9,
             "published_date": "2026-04-25",
         },
         {
             "url": "https://investasi.bisnis.com/read/20260112/b/b",
             "title": "B",
-            "content": "word " * 30,
+            "content": "word " * 80,
             "score": 0.8,
             "published_date": "2026-01-12",
         },

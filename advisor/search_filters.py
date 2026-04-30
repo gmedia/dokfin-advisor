@@ -103,6 +103,37 @@ def _word_count(text: str) -> int:
     return len(text.split())
 
 
+def _is_pdf_result(*, title: str, url: str) -> bool:
+    t = (title or "").strip().lower()
+    u = (url or "").strip().lower()
+    return "[pdf]" in t or u.endswith(".pdf")
+
+
+def _looks_like_toc_or_table(*, title: str, content: str) -> bool:
+    t = (title or "").lower()
+    c = (content or "").lower()
+    keywords = (
+        "daftar isi",
+        "table of contents",
+        "glossary",
+        "glosarium",
+        "daftar tabel",
+        "daftar gambar",
+        "tabel ",
+        "table ",
+    )
+    if any(k in t for k in keywords) or any(k in c for k in keywords):
+        return True
+
+    # Heuristik: konten tabel/daftar biasanya punya banyak baris pendek.
+    lines = [ln.strip() for ln in (content or "").splitlines() if ln.strip()]
+    if len(lines) >= 30:
+        short = sum(1 for ln in lines if len(ln) <= 30)
+        if short / len(lines) >= 0.65:
+            return True
+    return False
+
+
 def _freshness_bonus(content: str, pub: date | None, *, reference_date: date) -> float:
     """Heuristik kecil untuk prefer hasil yang lebih fresh dan informatif (tanpa hard filter)."""
     bonus = 0.0
@@ -159,10 +190,17 @@ def filter_tavily_results(
 
     for r in results:
         url = str(r.get("url") or "")
+        title = str(r.get("title") or "")
+        if _is_pdf_result(title=title, url=url):
+            continue
         host = hostname_from_url(url)
         if trusted_domains and not _hostname_in_trust_list(host, trusted_domains):
             continue
         content = str(r.get("content") or "")
+        if _looks_like_toc_or_table(title=title, content=content):
+            continue
+        if len(content.strip()) < 220:
+            continue
         if _word_count(content) < min_words:
             continue
         pub = published_date_for_result(r)
