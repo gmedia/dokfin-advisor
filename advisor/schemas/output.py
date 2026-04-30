@@ -77,6 +77,7 @@ class KonteksPasarItem(BaseModel):
     dampak_ke_bisnis: str
     relevansi: str
     sumber: str | None = None
+    diakses_pada: str | None = None
 
 
 class RekomendasiPrioritasItem(BaseModel):

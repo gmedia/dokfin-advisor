@@ -1,4 +1,7 @@
-"""Tavily result cache: key = MD5(keyword.lower().strip()), TTL 24h (PRD §5.1)."""
+"""Tavily result cache: key = MD5(keyword + policy salt), TTL 24h (PRD §5.1).
+
+Salt mem-bust cache saat kebijakan domain / filter berubah.
+"""
 
 from __future__ import annotations
 
@@ -7,9 +10,9 @@ import time
 from typing import Any
 
 
-def cache_key_for_keyword(keyword: str) -> str:
-    normalized = keyword.lower().strip()
-    return hashlib.md5(normalized.encode("utf-8")).hexdigest()
+def cache_key_for_keyword(keyword: str, *, policy_salt: str = "") -> str:
+    normalized = (keyword.lower().strip() + "|" + policy_salt).encode("utf-8")
+    return hashlib.md5(normalized).hexdigest()
 
 
 class MemoryTTLCache:

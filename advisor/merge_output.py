@@ -8,6 +8,7 @@ from typing import Any
 
 from advisor.schemas.input import JobPayload
 from advisor.scoring import get_label_skor
+from advisor.search_filters import hostname_from_url
 
 # Urutan "terburuk" untuk memilih status agregat per dimensi (PRD-style).
 _STATUS_RANK: dict[str, int] = {
@@ -35,12 +36,59 @@ def worst_status_in_dimensi(block: dict[str, Any]) -> str:
     return "SEHAT"
 
 
+def _normalize_sumber(s: str | None) -> str:
+    if not s:
+        return ""
+    s2 = str(s).strip()
+    if not s2:
+        return ""
+    if s2.startswith("http://") or s2.startswith("https://"):
+        return hostname_from_url(s2)
+    h = s2.lower()
+    if h.startswith("www."):
+        h = h[4:]
+    return h
+
+
+def merge_konteks_pasar_transparency(out: dict[str, Any], seed: list[dict[str, Any]] | None) -> None:
+    """Isi / perkaya konteks_pasar dengan sumber dan tanggal akses dari Node B."""
+    if not seed:
+        return
+    kp = out.get("konteks_pasar")
+    if not isinstance(kp, list):
+        kp = []
+
+    by_domain: dict[str, dict[str, Any]] = {}
+    for s in seed:
+        if not isinstance(s, dict):
+            continue
+        dom = _normalize_sumber(str(s.get("sumber") or ""))
+        if dom:
+            by_domain[dom] = s
+
+    if not kp:
+        out["konteks_pasar"] = [dict(x) for x in seed if isinstance(x, dict)]
+        return
+
+    for item in kp:
+        if not isinstance(item, dict):
+            continue
+        dom = _normalize_sumber(item.get("sumber"))
+        src = by_domain.get(dom) if dom else None
+        if src:
+            if not item.get("diakses_pada") and src.get("diakses_pada"):
+                item["diakses_pada"] = src["diakses_pada"]
+            if not item.get("sumber") and src.get("sumber"):
+                item["sumber"] = src["sumber"]
+
+
 def merge_deterministic_into_raw(
     *,
     payload: JobPayload,
     skor_per_dimensi: dict[str, float],
     skor_keseluruhan: float,
     raw: dict[str, Any],
+    konteks_pasar_seed: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return a new dict: LLM narrative preserved where possible; skor/status overwritten."""
     out = deepcopy(raw)
@@ -94,6 +142,8 @@ def merge_deterministic_into_raw(
     kp = out.get("konteks_pasar")
     if not isinstance(kp, list):
         out["konteks_pasar"] = []
+
+    merge_konteks_pasar_transparency(out, konteks_pasar_seed)
 
     return out
 

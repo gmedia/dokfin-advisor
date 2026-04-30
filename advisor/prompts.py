@@ -72,7 +72,9 @@ Output HARUS JSON valid saja, tanpa markdown fence. Ikuti struktur:
 - ringkasan_eksekutif: { narasi, highlight_positif[], highlight_warning[] }
 - dimensi: per likuiditas, profitabilitas, efisiensi, solvabilitas, sdm, kepatuhan:
   { skor, status, narasi, saran[] }
-- konteks_pasar: array { topik, konten, dampak_ke_bisnis, relevansi, sumber }
+- konteks_pasar: array { topik, konten, dampak_ke_bisnis, relevansi, sumber, diakses_pada }
+  Untuk setiap poin: isi `sumber` dengan domain (mis. bi.go.id) dan `diakses_pada` dengan tanggal YYYY-MM-DD
+  persis seperti di benih JSON bila tersedia, agar UI bisa menampilkan transparansi sumber.
 - rekomendasi_prioritas: tepat 3 item, prioritas 1-3, label SEGERA / BULAN_INI / PELUANG
 
 Pastikan ada tepat 3 rekomendasi_prioritas dengan label yang benar."""
@@ -87,6 +89,7 @@ def build_node_c_messages(
     reasoning: dict[str, Any],
     disclaimer: str,
     model_name_placeholder: str,
+    konteks_pasar_seed: list[dict[str, Any]] | None = None,
 ) -> list[SystemMessage | HumanMessage]:
     p = payload.profil_bisnis
     r = reasoning
@@ -100,12 +103,20 @@ def build_node_c_messages(
 - Jumlah karyawan: {p.jumlah_karyawan} orang
 - Periode laporan: {p.periode_analisis}
 {disclaimer}"""
+    seed_block = ""
+    if konteks_pasar_seed:
+        seed_block = (
+            "\n\nBENIH KONTEKS PASAR (dari pencarian terverifikasi; salin `sumber` dan "
+            "`diakses_pada` ke item konteks_pasar di JSON keluaran):\n"
+            + json.dumps(konteks_pasar_seed, ensure_ascii=False, indent=2)
+        )
     system = (
         NODE_C_SYSTEM
         + "\n\nTENTANG BISNIS:\n"
         + business_block
         + "\n\nDATA PASAR TERKINI:\n"
         + (market_context or "(tidak ada data pasar)")
+        + seed_block
     )
     user = f"""Analisis kesehatan keuangan usaha berikut dan hasilkan laporan lengkap.
 

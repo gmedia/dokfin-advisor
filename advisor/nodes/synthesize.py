@@ -33,6 +33,12 @@ def make_synthesize_node(deps: AdvisorDeps):
         payload = JobPayload.model_validate(state["payload"])
         reasoning = state.get("reasoning") or {}
         market_context = str(state.get("market_context") or "")
+        seed_raw = state.get("konteks_pasar_seed")
+        konteks_pasar_seed: list[dict[str, Any]] | None = None
+        if isinstance(seed_raw, list):
+            konteks_pasar_seed = [x for x in seed_raw if isinstance(x, dict)]
+            if not konteks_pasar_seed:
+                konteks_pasar_seed = None
         skor_per_dimensi = state["skor_per_dimensi"]
         skor_keseluruhan = float(state["skor_keseluruhan"])
         disclaimer = _disclaimer_kelengkapan(payload.profil_bisnis.kelengkapan_data_persen)
@@ -46,6 +52,7 @@ def make_synthesize_node(deps: AdvisorDeps):
             reasoning=reasoning,
             disclaimer=disclaimer,
             model_name_placeholder=model_ph,
+            konteks_pasar_seed=konteks_pasar_seed,
         )
 
         t0 = time.perf_counter()
@@ -60,6 +67,7 @@ def make_synthesize_node(deps: AdvisorDeps):
             skor_per_dimensi=skor_per_dimensi,
             skor_keseluruhan=skor_keseluruhan,
             raw=raw,
+            konteks_pasar_seed=konteks_pasar_seed,
         )
 
         merged["generated_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")

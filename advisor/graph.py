@@ -49,6 +49,7 @@ class AdvisorState(TypedDict, total=False):
     skor_keseluruhan: float
     reasoning: dict[str, Any]
     market_context: str
+    konteks_pasar_seed: list
     raw_output: dict[str, Any]
     merged_output: dict[str, Any]
     final_output: dict[str, Any]
