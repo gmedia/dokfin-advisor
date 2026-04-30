@@ -114,8 +114,16 @@ def _job_id_for_failed_response(payload: dict[str, Any]) -> UUID:
     return uuid4()
 
 
-def build_default_deps() -> AdvisorDeps:
-    """Production-oriented deps using ChatOpenAI (requires OPENAI_API_KEY)."""
+def _llm_timeout_s(*, google: bool) -> float:
+    if google:
+        raw = os.environ.get("GOOGLE_TIMEOUT_S")
+        if raw:
+            return float(raw)
+    return float(os.environ.get("OPENAI_TIMEOUT_S", "120"))
+
+
+def _build_openai_deps() -> AdvisorDeps:
+    """ChatOpenAI; requires OPENAI_API_KEY."""
 
     from langchain_openai import ChatOpenAI
 
@@ -124,7 +132,7 @@ def build_default_deps() -> AdvisorDeps:
 
     model_a = os.environ.get("OPENAI_MODEL_A", "gpt-4o-mini")
     model_c = os.environ.get("OPENAI_MODEL_C", "gpt-4o")
-    timeout_s = float(os.environ.get("OPENAI_TIMEOUT_S", "120"))
+    timeout_s = _llm_timeout_s(google=False)
     llm_a = ChatOpenAI(model=model_a, temperature=0, timeout=timeout_s)
     llm_c = ChatOpenAI(model=model_c, temperature=0.2, timeout=timeout_s)
     acc = TokenUsageAccumulator()
@@ -148,6 +156,51 @@ def build_default_deps() -> AdvisorDeps:
         model_name_c=model_c,
         token_usage=acc,
     )
+
+
+def _build_google_genai_deps() -> AdvisorDeps:
+    """ChatGoogleGenerativeAI; set GOOGLE_API_KEY (atau GEMINI_API_KEY)."""
+
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
+    from advisor.cache import MemoryTTLCache
+    from advisor.llm_usage import TokenUsageAccumulator
+
+    model_a = os.environ.get("GOOGLE_MODEL_A", "gemini-2.0-flash")
+    model_c = os.environ.get("GOOGLE_MODEL_C", "gemini-2.0-flash")
+    timeout_s = _llm_timeout_s(google=True)
+    llm_a = ChatGoogleGenerativeAI(model=model_a, temperature=0, timeout=timeout_s)
+    llm_c = ChatGoogleGenerativeAI(model=model_c, temperature=0.2, timeout=timeout_s)
+    acc = TokenUsageAccumulator()
+
+    def invoke_a(messages: list) -> str:
+        r = llm_a.invoke(messages)
+        acc.add_node_a(r)
+        return str(r.content or "")
+
+    def invoke_c(messages: list) -> str:
+        r = llm_c.invoke(messages)
+        acc.add_node_c(r)
+        return str(r.content or "")
+
+    return AdvisorDeps(
+        invoke_llm_a=invoke_a,
+        invoke_llm_c=invoke_c,
+        tavily_client=None,
+        cache=MemoryTTLCache(),
+        model_name_a=model_a,
+        model_name_c=model_c,
+        token_usage=acc,
+    )
+
+
+def build_default_deps() -> AdvisorDeps:
+    """Deps produksi: OpenAI (default) atau Gemini (`LLM_PROVIDER=google`)."""
+
+    provider = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
+    if provider in ("google", "gemini", "genai"):
+        return _build_google_genai_deps()
+    return _build_openai_deps()
 
 
 def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:

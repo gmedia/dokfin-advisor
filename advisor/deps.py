@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class AdvisorDeps:
-    """Replace callables in tests; use real ChatOpenAI in production."""
+    """Replace callables in tests; produksi pakai ChatOpenAI atau ChatGoogleGenerativeAI."""
 
     invoke_llm_a: Callable[[list[BaseMessage]], str]
     invoke_llm_c: Callable[[list[BaseMessage]], str]
