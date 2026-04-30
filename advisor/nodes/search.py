@@ -7,7 +7,7 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from tavily import TavilyClient
@@ -19,6 +19,7 @@ from advisor.search_filters import (
     filter_tavily_results,
     hostname_from_url,
     published_date_for_result,
+    root_domain_from_host,
 )
 from advisor.trusted_domains import trusted_domain_set, trusted_domains_for_tavily
 
@@ -91,7 +92,6 @@ def _seeds_from_results(
     *,
     reference_date: datetime,
     primary_days: int,
-    used_max_age_days: int,
 ) -> list[dict[str, Any]]:
     seeds: list[dict[str, Any]] = []
     for r in filtered:
@@ -101,7 +101,7 @@ def _seeds_from_results(
         content = str(r.get("content") or "")
         pub = published_date_for_result(r)
         # Label ringan jika kita terpaksa pakai fallback (lebih tua dari primary window).
-        if pub is not None and used_max_age_days > primary_days:
+        if pub is not None:
             age_days = (reference_date.date() - pub).days
             if age_days > primary_days:
                 prefix = (
@@ -123,6 +123,75 @@ def _seeds_from_results(
             },
         )
     return seeds
+
+
+def _pick_results_with_ladders(
+    results: list[dict[str, Any]],
+    *,
+    trusted_domains: set[str],
+    reference_date: date,
+    min_words: int,
+    max_keep: int,
+    min_keep: int,
+    ladder_days: list[int],
+) -> list[dict[str, Any]]:
+    """Pick results with age ladder; aim for >=min_keep and up to max_keep."""
+    min_keep = max(0, min(min_keep, max_keep))
+    picked: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+    seen_roots: set[str] = set()
+
+    def _add_candidates(cands: list[dict[str, Any]], *, target: int) -> None:
+        nonlocal picked
+        if len(picked) >= target:
+            return
+        # 1) Prefer diverse roots
+        for r in cands:
+            if len(picked) >= target:
+                break
+            url = str(r.get("url") or "")
+            if url and url in seen_urls:
+                continue
+            host = hostname_from_url(url)
+            root = root_domain_from_host(host) or host
+            if root and root in seen_roots:
+                continue
+            if url:
+                seen_urls.add(url)
+            if root:
+                seen_roots.add(root)
+            picked.append(r)
+        # 2) Fill remaining regardless root (last resort)
+        for r in cands:
+            if len(picked) >= target:
+                break
+            url = str(r.get("url") or "")
+            if url and url in seen_urls:
+                continue
+            host = hostname_from_url(url)
+            root = root_domain_from_host(host) or host
+            if url:
+                seen_urls.add(url)
+            if root:
+                seen_roots.add(root)
+            picked.append(r)
+
+    for days in ladder_days:
+        cands = filter_tavily_results(
+            results,
+            trusted_domains=trusted_domains,
+            reference_date=reference_date,
+            max_keep=max_keep,
+            min_words=min_words,
+            max_age=timedelta(days=days),
+        )
+        # Ensure we get at least min_keep, then fill up to max_keep
+        target = min_keep if len(picked) < min_keep else max_keep
+        _add_candidates(cands, target=target)
+        if len(picked) >= max_keep:
+            break
+
+    return picked[:max_keep]
 
 
 def run_search(
@@ -182,36 +251,17 @@ def run_search(
             primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
             fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
             fallback2_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK2", "183"))
-
-            filtered = filter_tavily_results(
+            max_keep = 3
+            min_keep = int(os.environ.get("TAVILY_MIN_KEEP", "2"))
+            filtered = _pick_results_with_ladders(
                 results,
                 trusted_domains=trusted,
                 reference_date=ref_date,
-                max_keep=3,
                 min_words=min_words,
-                max_age=timedelta(days=primary_days),
+                max_keep=max_keep,
+                min_keep=min_keep,
+                ladder_days=[primary_days, fallback_days, fallback2_days],
             )
-            used_days = primary_days
-            if not filtered:
-                filtered = filter_tavily_results(
-                    results,
-                    trusted_domains=trusted,
-                    reference_date=ref_date,
-                    max_keep=3,
-                    min_words=min_words,
-                    max_age=timedelta(days=fallback_days),
-                )
-                used_days = fallback_days
-            if not filtered:
-                filtered = filter_tavily_results(
-                    results,
-                    trusted_domains=trusted,
-                    reference_date=ref_date,
-                    max_keep=3,
-                    min_words=min_words,
-                    max_age=timedelta(days=fallback2_days),
-                )
-                used_days = fallback2_days
             access_date = ref_date.isoformat()
             block = _format_market_block(kw, answer, filtered)
             seeds = _seeds_from_results(
@@ -219,7 +269,6 @@ def run_search(
                 access_date,
                 reference_date=ref_dt,
                 primary_days=primary_days,
-                used_max_age_days=used_days,
             )
             cache.set(ck, {"market_block": block, "seed": seeds})
             blocks.append(block)

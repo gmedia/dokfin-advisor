@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 from advisor.merge_output import merge_konteks_pasar_transparency
-from advisor.nodes.search import _seeds_from_results
+from advisor.nodes.search import _pick_results_with_ladders, _seeds_from_results
 from advisor.search_filters import filter_tavily_results
 
 
@@ -212,6 +212,7 @@ def test_filter_prefers_diverse_root_domains() -> None:
     assert any("bisnis.com" in u for u in urls)
     assert any("kontan.co.id" in u for u in urls)
 
+
 def test_filter_max_three_by_score() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()
@@ -319,6 +320,71 @@ def test_seed_labels_stale_when_using_fallback_window() -> None:
         "2026-04-30",
         reference_date=ref_dt,
         primary_days=30,
-        used_max_age_days=183,
     )
     assert seeds[0]["konten"].startswith("Catatan: sumber dipublikasikan 2026-01-12")
+
+
+def test_pick_results_tops_up_to_min_keep_across_ladders() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://kontan.co.id/read/20260425/a/a",
+            "title": "New",
+            "content": "word " * 30,
+            "score": 0.9,
+            "published_date": "2026-04-25",
+        },
+        {
+            "url": "https://kompas.com/read/20260112/b/b",
+            "title": "Old",
+            "content": "word " * 30,
+            "score": 0.8,
+            "published_date": "2026-01-12",
+        },
+    ]
+    out = _pick_results_with_ladders(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        min_words=20,
+        max_keep=3,
+        min_keep=2,
+        ladder_days=[30, 60, 183],
+    )
+    assert len(out) == 2
+    urls = {r["url"] for r in out}
+    assert "20260425" in "".join(urls)
+    assert "20260112" in "".join(urls)
+
+
+def test_pick_results_allows_same_root_domain_as_last_resort() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://semarang.bisnis.com/read/20260425/a/a",
+            "title": "A",
+            "content": "word " * 30,
+            "score": 0.9,
+            "published_date": "2026-04-25",
+        },
+        {
+            "url": "https://investasi.bisnis.com/read/20260112/b/b",
+            "title": "B",
+            "content": "word " * 30,
+            "score": 0.8,
+            "published_date": "2026-01-12",
+        },
+    ]
+    out = _pick_results_with_ladders(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        min_words=20,
+        max_keep=3,
+        min_keep=2,
+        ladder_days=[30, 60, 183],
+    )
+    assert len(out) == 2
+    assert all("bisnis.com" in r["url"] for r in out)

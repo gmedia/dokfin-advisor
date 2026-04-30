@@ -21,6 +21,21 @@ def hostname_from_url(url: str) -> str:
     return netloc
 
 
+def root_domain_from_host(host: str) -> str:
+    """Best-effort root domain for diversity (works for common ID suffixes)."""
+    h = (host or "").lower().strip(".")
+    if not h:
+        return ""
+    labels = h.split(".")
+    if len(labels) <= 2:
+        return h
+    public_suffixes = ("co.id", "go.id", "ac.id", "or.id", "web.id")
+    for suf in public_suffixes:
+        if h.endswith("." + suf) or h == suf:
+            return ".".join(labels[-3:])
+    return ".".join(labels[-2:])
+
+
 def _parse_date_from_url(url: str) -> date | None:
     """Parse publish date from common news URL patterns (fallback when metadata missing)."""
     if not url:
@@ -112,8 +127,10 @@ def _hostname_in_trust_list(host: str, trusted: set[str]) -> bool:
     host = host.lower()
     if host in trusted:
         return True
-    allow_subdomains = (
-        os.environ.get("TAVILY_ALLOW_SUBDOMAINS", "1").strip().lower() in ("1", "true", "yes")
+    allow_subdomains = os.environ.get("TAVILY_ALLOW_SUBDOMAINS", "1").strip().lower() in (
+        "1",
+        "true",
+        "yes",
     )
     if not allow_subdomains:
         return False
@@ -159,26 +176,13 @@ def filter_tavily_results(
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    def root_domain(host: str) -> str:
-        h = (host or "").lower().strip(".")
-        if not h:
-            return ""
-        labels = h.split(".")
-        if len(labels) <= 2:
-            return h
-        public_suffixes = ("co.id", "go.id", "ac.id", "or.id", "web.id")
-        for suf in public_suffixes:
-            if h.endswith("." + suf) or h == suf:
-                return ".".join(labels[-3:])
-        return ".".join(labels[-2:])
-
     # Diversity pass: prefer distinct root-domains (anti “semua dari satu publisher”).
     picked: list[dict[str, Any]] = []
     seen_roots: set[str] = set()
     rest: list[dict[str, Any]] = []
     for _score, r in scored:
         host = hostname_from_url(str(r.get("url") or ""))
-        root = root_domain(host) or host
+        root = root_domain_from_host(host) or host
         if root and root not in seen_roots and len(picked) < max_keep:
             seen_roots.add(root)
             picked.append(r)

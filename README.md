@@ -49,7 +49,7 @@ Service `advisor` memakai `NATS_URL=nats://nats:4222` dan `REDIS_URL=redis://red
 | NATS | `NATS_URL`, `NATS_STREAM_*`, `NATS_SUBJECT_*`, `ADVISOR_MAX_CONCURRENCY` |
 | LLM | `OPENAI_*` atau `LLM_PROVIDER=google` + `GOOGLE_API_KEY`, `GOOGLE_MODEL_*` |
 | Biaya estimasi | `OPENAI_PRICE_*_PER_M_IDR` atau `GOOGLE_PRICE_*_PER_M_IDR` (perkiraan) |
-| Tavily | `TAVILY_*`, `TAVILY_DROP_UNDATED=1`, `TAVILY_ALLOW_SUBDOMAINS=0`, `TAVILY_MAX_AGE_DAYS_*` |
+| Tavily | `TAVILY_*`, `TAVILY_DROP_UNDATED=1`, `TAVILY_ALLOW_SUBDOMAINS=0`, `TAVILY_MAX_AGE_DAYS_*`, `TAVILY_MIN_KEEP=2` |
 | Idempotensi | `REDIS_URL`, `ADVISOR_IDEMPOTENCY_*` |
 
 Waktu pemrosesan banyak bergantung pada Node C (LLM); respons bisa puluhan detik — set ekspektasi di UI (indikator tahap / loading).
@@ -57,5 +57,6 @@ Waktu pemrosesan banyak bergantung pada Node C (LLM); respons bisa puluhan detik
 Untuk meningkatkan relevansi konteks pasar, disarankan mengaktifkan `TAVILY_DROP_UNDATED=1` agar artikel tanpa tanggal terbit tidak ikut terpilih.
 Jika kamu ingin whitelist lebih ketat, set `TAVILY_ALLOW_SUBDOMAINS=0` agar hanya domain persis yang lolos (subdomain ditolak kecuali di-allowlist eksplisit lewat `TAVILY_TRUSTED_DOMAINS`).
 Untuk freshness sesuai tanggal run, gunakan `TAVILY_MAX_AGE_DAYS_PRIMARY=30`, `TAVILY_MAX_AGE_DAYS_FALLBACK=60`, dan fallback terakhir `TAVILY_MAX_AGE_DAYS_FALLBACK2=183` (≈ 6 bulan).
+Untuk menghindari `konteks_pasar` terlalu “sepi”, set `TAVILY_MIN_KEEP=2`: bila primary window hanya menghasilkan 1 item, sistem akan top-up dari fallback window sampai minimal 2 (jika tetap tidak cukup, sistem memakai yang ada tanpa error).
 Jika metadata tanggal artikel kosong, sistem mencoba parse tanggal dari URL berita (mis. pola `/read/YYYYMMDD/`) agar artikel jadul tetap bisa difilter.
 
