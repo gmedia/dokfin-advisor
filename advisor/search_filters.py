@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -18,6 +19,34 @@ def hostname_from_url(url: str) -> str:
     if netloc.startswith("www."):
         netloc = netloc[4:]
     return netloc
+
+
+def _parse_date_from_url(url: str) -> date | None:
+    """Parse publish date from common news URL patterns (fallback when metadata missing)."""
+    if not url:
+        return None
+    try:
+        path = urlparse(url).path
+    except ValueError:
+        return None
+
+    # /read/YYYYMMDD/
+    m = re.search(r"/read/(\d{8})/", path)
+    if m:
+        try:
+            return datetime.strptime(m.group(1), "%Y%m%d").date()
+        except ValueError:
+            return None
+
+    # /YYYY/MM/DD/ or /YYYY-MM-DD/
+    m = re.search(r"/(\d{4})[/-](\d{2})[/-](\d{2})/", path)
+    if m:
+        try:
+            return date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        except ValueError:
+            return None
+
+    return None
 
 
 def _parse_published_date(raw: Any) -> date | None:
@@ -44,6 +73,15 @@ def _published_raw(result: dict[str, Any]) -> Any:
         if v:
             return v
     return None
+
+
+def published_date_for_result(result: dict[str, Any]) -> date | None:
+    """Best-effort publish date: metadata first, then parse from URL."""
+    pub = _parse_published_date(_published_raw(result))
+    if pub is not None:
+        return pub
+    url = str(result.get("url") or "")
+    return _parse_date_from_url(url)
 
 
 def _word_count(text: str) -> int:
@@ -110,7 +148,7 @@ def filter_tavily_results(
         content = str(r.get("content") or "")
         if _word_count(content) < min_words:
             continue
-        pub = _parse_published_date(_published_raw(r))
+        pub = published_date_for_result(r)
         if drop_undated and pub is None:
             continue
         if pub is not None and pub < cutoff:
@@ -120,4 +158,35 @@ def filter_tavily_results(
         scored.append((score, r))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [r for _, r in scored[:max_keep]]
+
+    def root_domain(host: str) -> str:
+        h = (host or "").lower().strip(".")
+        if not h:
+            return ""
+        labels = h.split(".")
+        if len(labels) <= 2:
+            return h
+        public_suffixes = ("co.id", "go.id", "ac.id", "or.id", "web.id")
+        for suf in public_suffixes:
+            if h.endswith("." + suf) or h == suf:
+                return ".".join(labels[-3:])
+        return ".".join(labels[-2:])
+
+    # Diversity pass: prefer distinct root-domains (anti “semua dari satu publisher”).
+    picked: list[dict[str, Any]] = []
+    seen_roots: set[str] = set()
+    rest: list[dict[str, Any]] = []
+    for _score, r in scored:
+        host = hostname_from_url(str(r.get("url") or ""))
+        root = root_domain(host) or host
+        if root and root not in seen_roots and len(picked) < max_keep:
+            seen_roots.add(root)
+            picked.append(r)
+        else:
+            rest.append(r)
+    # Fill remaining slots if diversity leaves less than max_keep.
+    for r in rest:
+        if len(picked) >= max_keep:
+            break
+        picked.append(r)
+    return picked[:max_keep]

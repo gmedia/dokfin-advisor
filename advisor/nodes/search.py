@@ -15,7 +15,11 @@ from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_fixe
 
 from advisor.cache import MemoryTTLCache, cache_key_for_keyword
 from advisor.logging_setup import get_logger, log_node_timing
-from advisor.search_filters import filter_tavily_results, hostname_from_url
+from advisor.search_filters import (
+    filter_tavily_results,
+    hostname_from_url,
+    published_date_for_result,
+)
 from advisor.trusted_domains import trusted_domain_set, trusted_domains_for_tavily
 
 _LOG = get_logger(__name__)
@@ -81,13 +85,31 @@ def _search_with_retries(
     )(_call)
 
 
-def _seeds_from_results(filtered: list[dict[str, Any]], access_date: str) -> list[dict[str, Any]]:
+def _seeds_from_results(
+    filtered: list[dict[str, Any]],
+    access_date: str,
+    *,
+    reference_date: datetime,
+    primary_days: int,
+    used_max_age_days: int,
+) -> list[dict[str, Any]]:
     seeds: list[dict[str, Any]] = []
     for r in filtered:
         url = str(r.get("url") or "")
         host = hostname_from_url(url) or "unknown"
         title = str(r.get("title") or "").strip()
         content = str(r.get("content") or "")
+        pub = published_date_for_result(r)
+        # Label ringan jika kita terpaksa pakai fallback (lebih tua dari primary window).
+        if pub is not None and used_max_age_days > primary_days:
+            age_days = (reference_date.date() - pub).days
+            if age_days > primary_days:
+                prefix = (
+                    f"Catatan: sumber dipublikasikan {pub.isoformat()} "
+                    f"(bukan data {primary_days} hari terakhir). "
+                )
+                if not content.startswith("Catatan:"):
+                    content = prefix + content
         seeds.append(
             {
                 "topik": (title or host)[:200],
@@ -118,7 +140,8 @@ def run_search(
     include_domains = trusted_domains_for_tavily()
     salt = _policy_salt(include_domains)
     trusted = trusted_domain_set()
-    ref_date = datetime.now(UTC).date()
+    ref_dt = datetime.now(UTC)
+    ref_date = ref_dt.date()
 
     t0 = time.perf_counter()
     blocks: list[str] = []
@@ -158,6 +181,7 @@ def run_search(
             min_words = int(os.environ.get("TAVILY_MIN_WORDS", "100"))
             primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
             fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
+            fallback2_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK2", "183"))
 
             filtered = filter_tavily_results(
                 results,
@@ -167,6 +191,7 @@ def run_search(
                 min_words=min_words,
                 max_age=timedelta(days=primary_days),
             )
+            used_days = primary_days
             if not filtered:
                 filtered = filter_tavily_results(
                     results,
@@ -176,9 +201,26 @@ def run_search(
                     min_words=min_words,
                     max_age=timedelta(days=fallback_days),
                 )
+                used_days = fallback_days
+            if not filtered:
+                filtered = filter_tavily_results(
+                    results,
+                    trusted_domains=trusted,
+                    reference_date=ref_date,
+                    max_keep=3,
+                    min_words=min_words,
+                    max_age=timedelta(days=fallback2_days),
+                )
+                used_days = fallback2_days
             access_date = ref_date.isoformat()
             block = _format_market_block(kw, answer, filtered)
-            seeds = _seeds_from_results(filtered, access_date)
+            seeds = _seeds_from_results(
+                filtered,
+                access_date,
+                reference_date=ref_dt,
+                primary_days=primary_days,
+                used_max_age_days=used_days,
+            )
             cache.set(ck, {"market_block": block, "seed": seeds})
             blocks.append(block)
             for s in seeds:

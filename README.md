@@ -56,5 +56,6 @@ Waktu pemrosesan banyak bergantung pada Node C (LLM); respons bisa puluhan detik
 
 Untuk meningkatkan relevansi konteks pasar, disarankan mengaktifkan `TAVILY_DROP_UNDATED=1` agar artikel tanpa tanggal terbit tidak ikut terpilih.
 Jika kamu ingin whitelist lebih ketat, set `TAVILY_ALLOW_SUBDOMAINS=0` agar hanya domain persis yang lolos (subdomain ditolak kecuali di-allowlist eksplisit lewat `TAVILY_TRUSTED_DOMAINS`).
-Untuk freshness sesuai tanggal run, gunakan `TAVILY_MAX_AGE_DAYS_PRIMARY=30` dan `TAVILY_MAX_AGE_DAYS_FALLBACK=60`.
+Untuk freshness sesuai tanggal run, gunakan `TAVILY_MAX_AGE_DAYS_PRIMARY=30`, `TAVILY_MAX_AGE_DAYS_FALLBACK=60`, dan fallback terakhir `TAVILY_MAX_AGE_DAYS_FALLBACK2=183` (≈ 6 bulan).
+Jika metadata tanggal artikel kosong, sistem mencoba parse tanggal dari URL berita (mis. pola `/read/YYYYMMDD/`) agar artikel jadul tetap bisa difilter.
 

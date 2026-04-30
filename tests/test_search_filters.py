@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 from advisor.merge_output import merge_konteks_pasar_transparency
+from advisor.nodes.search import _seeds_from_results
 from advisor.search_filters import filter_tavily_results
 
 
@@ -142,6 +143,75 @@ def test_filter_two_pass_example_primary_empty_then_fallback_hits() -> None:
     assert len(fallback) == 1
 
 
+def test_filter_parses_url_date_and_drops_old_when_metadata_missing() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    # URL contains YYYYMMDD=20250929 (older than 6 months from ref)
+    results = [
+        {
+            "url": "https://semarang.bisnis.com/read/20250929/536/1915476/foo",
+            "title": "Old",
+            "content": "word " * 30,
+            "score": 0.9,
+        },
+        {
+            "url": "https://kontan.co.id/read/20260410/123/ok",
+            "title": "New",
+            "content": "word " * 30,
+            "score": 0.1,
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=183),
+        drop_undated=False,
+    )
+    assert len(out) == 1
+    assert "20260410" in out[0]["url"]
+
+
+def test_filter_prefers_diverse_root_domains() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    # Two results from *.bisnis.com (root: bisnis.com), one from kontan.co.id
+    results = [
+        {
+            "url": "https://semarang.bisnis.com/read/20260410/aaa/a",
+            "title": "A",
+            "content": "word " * 30,
+            "score": 0.95,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://investasi.bisnis.com/read/20260411/bbb/b",
+            "title": "B",
+            "content": "word " * 30,
+            "score": 0.9,
+            "published_date": ref.isoformat(),
+        },
+        {
+            "url": "https://kontan.co.id/read/20260409/ccc/c",
+            "title": "C",
+            "content": "word " * 30,
+            "score": 0.2,
+            "published_date": ref.isoformat(),
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=2,
+        min_words=20,
+    )
+    urls = [r["url"] for r in out]
+    assert any("bisnis.com" in u for u in urls)
+    assert any("kontan.co.id" in u for u in urls)
+
 def test_filter_max_three_by_score() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()
@@ -233,3 +303,22 @@ def test_merge_replaces_llm_non_hostname_sources_with_seed() -> None:
     merge_konteks_pasar_transparency(out, seed)
     assert out["konteks_pasar"][0]["sumber"] == "kompas.com"
     assert out["konteks_pasar"][0]["diakses_pada"] == "2026-04-30"
+
+
+def test_seed_labels_stale_when_using_fallback_window() -> None:
+    ref_dt = datetime(2026, 4, 30, tzinfo=UTC)
+    filtered = [
+        {
+            "url": "https://kontan.co.id/read/20260112/x/y",
+            "title": "T",
+            "content": "isi konten",
+        }
+    ]
+    seeds = _seeds_from_results(
+        filtered,
+        "2026-04-30",
+        reference_date=ref_dt,
+        primary_days=30,
+        used_max_age_days=183,
+    )
+    assert seeds[0]["konten"].startswith("Catatan: sumber dipublikasikan 2026-01-12")
