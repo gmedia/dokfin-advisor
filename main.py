@@ -1,4 +1,4 @@
-"""Entry point: load env, configure logging, demo startup (NATS/graph in later sprints)."""
+"""Entry point: NATS worker when NATS_URL is set, else short demo bootstrap."""
 
 from __future__ import annotations
 
@@ -15,11 +15,17 @@ def main() -> None:
     configure_logging()
     log = get_logger("dokfin_advisor")
 
+    if os.environ.get("NATS_URL"):
+        from advisor.nats_worker import run_nats_worker_sync
+
+        log.info("nats_worker_mode")
+        run_nats_worker_sync()
+        return
+
     job_id = os.environ.get("DEMO_JOB_ID", str(uuid.uuid4()))
     structlog.contextvars.bind_contextvars(job_id=job_id)
 
-    log.info("service_startup", service="dokfin-advisor")
-    # Demo: prove node timing helper works (real pipeline will call per A/B/C/D)
+    log.info("service_startup", service="dokfin-advisor", mode="demo_no_nats")
     log_node_timing(log, job_id=job_id, node="bootstrap", duration_ms=0.0)
 
 

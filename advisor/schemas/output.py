@@ -119,6 +119,9 @@ class AdvisorResultFailed(BaseModel):
     error_code: ErrorCode
     error_message: str
     retry_count: int = Field(..., ge=0)
+    processing_time_seconds: float | None = None
+    token_usage: TokenUsage | None = None
+    estimated_cost_idr: float | None = None
 
 
 AdvisorResult = Annotated[

@@ -4,15 +4,25 @@ from __future__ import annotations
 
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any
 
 from tavily import TavilyClient
+from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_fixed
 
 from advisor.cache import MemoryTTLCache, cache_key_for_keyword
 from advisor.logging_setup import get_logger, log_node_timing
 
 _LOG = get_logger(__name__)
 _default_cache = MemoryTTLCache()
+
+
+def _tavily_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, (TimeoutError, FuturesTimeout, OSError)):
+        return True
+    msg = str(exc).lower()
+    return any(x in msg for x in ("timeout", "timed out", "500", "502", "503", "504", "connection"))
 
 
 def _format_market_block(keyword: str, answer: str, results: list[dict[str, Any]]) -> str:
@@ -28,6 +38,27 @@ def _format_market_block(keyword: str, answer: str, results: list[dict[str, Any]
     return "\n".join(lines)
 
 
+def _search_with_retries(client: TavilyClient, kw: str, timeout_s: float) -> dict[str, Any]:
+    def _call() -> dict[str, Any]:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(
+                lambda: client.search(
+                    query=kw,
+                    max_results=3,
+                    search_depth="basic",
+                    include_answer=True,
+                ),
+            )
+            return fut.result(timeout=timeout_s)
+
+    return Retrying(
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception(_tavily_retryable),
+        wait=wait_fixed(0.4),
+        reraise=True,
+    )(_call)
+
+
 def run_search(
     state: dict[str, Any],
     *,
@@ -39,6 +70,7 @@ def run_search(
     reasoning = state.get("reasoning") or {}
     keywords = reasoning.get("search_keywords") or []
     cache = cache or _default_cache
+    timeout_s = float(os.environ.get("TAVILY_TIMEOUT_S", "30"))
 
     t0 = time.perf_counter()
     blocks: list[str] = []
@@ -59,12 +91,7 @@ def run_search(
         if client is None:
             continue
         try:
-            resp = client.search(
-                query=kw,
-                max_results=3,
-                search_depth="basic",
-                include_answer=True,
-            )
+            resp = _search_with_retries(client, kw, timeout_s)
             answer = str(resp.get("answer") or "")
             results = list(resp.get("results") or [])
             block = _format_market_block(kw, answer, results)

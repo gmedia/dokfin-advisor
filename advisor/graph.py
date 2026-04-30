@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime
 from typing import Any, Literal, TypedDict
+from uuid import UUID, uuid4
 
 from langgraph.graph import END, START, StateGraph
+from pydantic import ValidationError
 
 from advisor.deps import AdvisorDeps
 from advisor.logging_setup import get_logger
@@ -13,7 +16,9 @@ from advisor.nodes.contextualize import make_contextualize_node
 from advisor.nodes.search import run_search
 from advisor.nodes.synthesize import make_synthesize_node
 from advisor.nodes.validate import validate_node
+from advisor.retry_llm import MAX_LLM_ATTEMPTS
 from advisor.schemas.input import JobPayload
+from advisor.schemas.output import AdvisorResultFailed, ErrorCode
 from advisor.scoring import hitung_skor_keseluruhan, skor_from_payload_dimensi
 
 _LOG = get_logger(__name__)
@@ -82,6 +87,16 @@ def build_graph(deps: AdvisorDeps):
     return g
 
 
+def _job_id_for_failed_response(payload: dict[str, Any]) -> UUID:
+    raw = payload.get("job_id")
+    if raw is not None:
+        try:
+            return UUID(str(raw))
+        except ValueError:
+            pass
+    return uuid4()
+
+
 def build_default_deps() -> AdvisorDeps:
     """Production-oriented deps using ChatOpenAI (requires OPENAI_API_KEY)."""
 
@@ -89,8 +104,9 @@ def build_default_deps() -> AdvisorDeps:
 
     model_a = os.environ.get("OPENAI_MODEL_A", "gpt-4o-mini")
     model_c = os.environ.get("OPENAI_MODEL_C", "gpt-4o")
-    llm_a = ChatOpenAI(model=model_a, temperature=0)
-    llm_c = ChatOpenAI(model=model_c, temperature=0.2)
+    timeout_s = float(os.environ.get("OPENAI_TIMEOUT_S", "120"))
+    llm_a = ChatOpenAI(model=model_a, temperature=0, timeout=timeout_s)
+    llm_c = ChatOpenAI(model=model_c, temperature=0.2, timeout=timeout_s)
 
     def invoke_a(messages: list) -> str:
         return str(llm_a.invoke(messages).content or "")
@@ -112,8 +128,31 @@ def build_default_deps() -> AdvisorDeps:
 
 def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
     """Jalankan graph; return dict DONE atau FAILED (JSON-friendly)."""
-    app = build_graph(deps).compile()
-    out = app.invoke({"payload": payload})
+    try:
+        JobPayload.model_validate(payload)
+    except ValidationError as e:
+        failed = AdvisorResultFailed(
+            job_id=_job_id_for_failed_response(payload),
+            generated_at=datetime.now(UTC),
+            error_code=ErrorCode.PAYLOAD_INVALID,
+            error_message=str(e)[:2000],
+            retry_count=0,
+        )
+        return failed.model_dump(mode="json")
+
+    try:
+        app = build_graph(deps).compile()
+        out = app.invoke({"payload": payload})
+    except RuntimeError as e:
+        failed = AdvisorResultFailed(
+            job_id=_job_id_for_failed_response(payload),
+            generated_at=datetime.now(UTC),
+            error_code=ErrorCode.LLM_INVALID_JSON,
+            error_message=str(e)[:2000],
+            retry_count=MAX_LLM_ATTEMPTS,
+        )
+        return failed.model_dump(mode="json")
+
     if out.get("final_output"):
         return out["final_output"]
     if out.get("failed_output"):
