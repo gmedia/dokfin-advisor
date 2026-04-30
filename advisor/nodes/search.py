@@ -29,10 +29,68 @@ _default_cache = MemoryTTLCache()
 
 
 def _policy_salt(domains: list[str] | None) -> str:
-    if not domains:
-        return "open:v2"
-    joined = ",".join(sorted(domains))
-    return hashlib.md5((joined + "|v2").encode("utf-8")).hexdigest()[:16]
+    parts: list[str] = []
+    if domains:
+        parts.append(",".join(sorted(domains)))
+    else:
+        parts.append("open")
+    parts.append(_tavily_topic())
+    parts.append(_tavily_search_depth())
+    parts.append(str(_tavily_raw_content_param()))
+    parts.append("v3")
+    joined = "|".join(parts)
+    return hashlib.md5(joined.encode("utf-8")).hexdigest()[:16]
+
+
+def _env_bool(name: str, default: str = "0") -> bool:
+    return os.environ.get(name, default).strip().lower() in ("1", "true", "yes")
+
+
+def _env_str(name: str, default: str = "") -> str:
+    return str(os.environ.get(name, default) or "").strip()
+
+
+def _tavily_raw_content_param() -> bool | str:
+    raw = _env_str("TAVILY_INCLUDE_RAW_CONTENT", "0").lower()
+    if raw in ("0", "false", "no", ""):
+        return False
+    if raw in ("1", "true", "yes", "markdown"):
+        return "markdown"
+    if raw in ("text",):
+        return "text"
+    # Fallback: treat any other truthy value as markdown.
+    return "markdown"
+
+
+def _tavily_topic() -> str:
+    # Default to "general" so we can use `country=ID` boost (Tavily: country only for general).
+    topic = _env_str("TAVILY_TOPIC", "general").lower()
+    if topic not in ("general", "news", "finance"):
+        return "general"
+    return topic
+
+
+def _tavily_search_depth() -> str:
+    depth = _env_str("TAVILY_SEARCH_DEPTH", "basic").lower()
+    if depth not in ("basic", "advanced"):
+        return "basic"
+    return depth
+
+
+def _tavily_country_for_topic(topic: str) -> str | None:
+    # `country` is only available for topic="general" per Tavily docs.
+    if topic != "general":
+        return None
+    # Default to Indonesia for Dokfin Advisor.
+    raw = _env_str("TAVILY_COUNTRY", "indonesia")
+    c = raw.strip().lower()
+    # Tavily expects a country name (lowercase), not ISO code.
+    if c in ("id", "idn", "indonesia"):
+        return "indonesia"
+    # If user provided an invalid value, omit `country` to avoid hard failure.
+    if not c or any(ch.isdigit() for ch in c):
+        return None
+    return c
 
 
 def _tavily_retryable(exc: BaseException) -> bool:
@@ -65,15 +123,34 @@ def _search_with_retries(
     timeout_s: float,
     *,
     include_domains: list[str] | None,
+    topic: str,
+    start_date: str | None,
+    end_date: str | None,
 ) -> dict[str, Any]:
     def _call() -> dict[str, Any]:
         with ThreadPoolExecutor(max_workers=1) as pool:
             kwargs: dict[str, Any] = {
                 "query": kw,
                 "max_results": _fetch_max_results(),
-                "search_depth": "basic",
+                "search_depth": _tavily_search_depth(),
+                "topic": topic,
                 "include_answer": True,
+                "auto_parameters": _env_bool("TAVILY_AUTO_PARAMETERS", "0"),
+                "include_raw_content": _tavily_raw_content_param(),
+                "include_usage": _env_bool("TAVILY_INCLUDE_USAGE", "0"),
+                "include_favicon": _env_bool("TAVILY_INCLUDE_FAVICON", "0"),
+                "exact_match": _env_bool("TAVILY_EXACT_MATCH", "0"),
             }
+            if kwargs["search_depth"] == "advanced":
+                kwargs["chunks_per_source"] = int(os.environ.get("TAVILY_CHUNKS_PER_SOURCE", "3"))
+            country = _tavily_country_for_topic(topic)
+            if country:
+                kwargs["country"] = country
+            # Use Tavily's built-in date range filter when provided.
+            if start_date:
+                kwargs["start_date"] = start_date
+            if end_date:
+                kwargs["end_date"] = end_date
             if include_domains:
                 kwargs["include_domains"] = include_domains
             fut = pool.submit(lambda: client.search(**kwargs))
@@ -85,6 +162,92 @@ def _search_with_retries(
         wait=wait_fixed(0.4),
         reraise=True,
     )(_call)
+
+
+def _merge_tavily_results(
+    a: list[dict[str, Any]],
+    b: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for r in list(a) + list(b):
+        if not isinstance(r, dict):
+            continue
+        url = str(r.get("url") or "")
+        if url and url in seen:
+            continue
+        if url:
+            seen.add(url)
+        out.append(r)
+    return out
+
+
+def _refetch_relaxed_candidates(
+    *,
+    client: TavilyClient,
+    keywords: list[str],
+    payload: JobPayload,
+    timeout_s: float,
+    ref_date: date,
+    fallback2_days: int,
+) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    """Second-pass fetch when results are empty/insufficient.
+
+    - bypass whitelist (open web)
+    - use topic=news (often better publish_date signals)
+    - relax min_words + min_relevance
+    """
+    per_kw_answer: dict[str, str] = {}
+    candidates: list[dict[str, Any]] = []
+
+    start_date = (ref_date - timedelta(days=fallback2_days)).isoformat()
+    end_date = ref_date.isoformat()
+
+    min_words = int(os.environ.get("TAVILY_MIN_WORDS_FALLBACK", "60"))
+    min_relevance = float(os.environ.get("TAVILY_MIN_RELEVANCE_FALLBACK", "0.6"))
+
+    primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
+    fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
+
+    for kw in keywords:
+        kw2 = str(kw).strip()
+        if not kw2:
+            continue
+        try:
+            resp = _search_with_retries(
+                client,
+                kw2,
+                timeout_s,
+                include_domains=None,
+                topic="news",
+                start_date=start_date,
+                end_date=end_date,
+            )
+            per_kw_answer[kw2] = str(resp.get("answer") or "")
+            results = list(resp.get("results") or [])
+            rel_filtered = _rank_and_filter_by_relevance(
+                results,
+                payload=payload,
+                keyword=kw2,
+                min_relevance=min_relevance,
+            )
+            filtered = _pick_results_with_ladders(
+                rel_filtered,
+                trusted_domains=set(),
+                reference_date=ref_date,
+                min_words=min_words,
+                max_keep=3,
+                min_keep=1,
+                ladder_days=[primary_days, fallback_days, fallback2_days],
+            )
+            for r in filtered:
+                r2 = dict(r)
+                r2["_kw"] = kw2
+                candidates.append(r2)
+        except Exception as e:  # noqa: BLE001
+            _LOG.warning("tavily_search_failed_relaxed", keyword=kw2, error=str(e))
+
+    return per_kw_answer, candidates
 
 
 def _seeds_from_results(
@@ -170,13 +333,15 @@ def _relevance_score_for_business(
     if kota in ("jogja",):
         kota_aliases = ("yogyakarta", "jogja", "diy")
 
-    business_terms: set[str] = set()
+    business_terms_core: set[str] = set()
     if industri:
-        business_terms.update(_tokenize(industri))
+        business_terms_core.update(_tokenize(industri))
     if sub:
-        business_terms.update(_tokenize(sub))
+        business_terms_core.update(_tokenize(sub))
+
+    location_terms: set[str] = set()
     for k in kota_aliases:
-        business_terms.update(_tokenize(k))
+        location_terms.update(_tokenize(k))
 
     kw_terms = _tokenize(keyword)
     generic_query_terms = {
@@ -212,16 +377,18 @@ def _relevance_score_for_business(
     kw_terms = {t for t in kw_terms if t not in generic_query_terms}
     text_terms = _tokenize(text)
 
-    business_hit = len(text_terms & business_terms)
+    core_hit = len(text_terms & business_terms_core)
     keyword_hit = len(text_terms & kw_terms)
+    location_hit = len(text_terms & location_terms)
 
-    # Hard gate: must match keyword OR business profile, otherwise it's likely off-topic.
-    if business_hit <= 0 and keyword_hit <= 0:
+    # Hard gate: location mention alone is not enough (too noisy).
+    if core_hit <= 0 and keyword_hit <= 0:
         return -1.0
 
     score = 0.0
     score += min(3.0, float(keyword_hit)) * 1.2
-    score += min(3.0, float(business_hit)) * 1.0
+    score += min(3.0, float(core_hit)) * 1.0
+    score += min(2.0, float(location_hit)) * 0.4
 
     # Generic demand signals (small bonus only; shouldn't override core match).
     demand_terms = (
@@ -435,13 +602,40 @@ def run_search(
         if client is None:
             continue
         try:
-            resp = _search_with_retries(client, kw, timeout_s, include_domains=include_domains)
-            answer = str(resp.get("answer") or "")
-            results = list(resp.get("results") or [])
-            min_words = int(os.environ.get("TAVILY_MIN_WORDS", "100"))
             primary_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "30"))
             fallback_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK", "60"))
             fallback2_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK2", "183"))
+            topic = _tavily_topic()
+            # Single API call per keyword: fetch up to the widest local window.
+            start_date = (ref_date - timedelta(days=fallback2_days)).isoformat()
+            end_date = ref_date.isoformat()
+            resp = _search_with_retries(
+                client,
+                kw,
+                timeout_s,
+                include_domains=include_domains,
+                topic=topic,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            answer = str(resp.get("answer") or "")
+            results = list(resp.get("results") or [])
+            # If whitelist yields too few usable results, retry once without include_domains.
+            used_open_fallback = False
+            if _env_bool("TAVILY_FALLBACK_OPEN", "1") and include_domains:
+                resp2 = _search_with_retries(
+                    client,
+                    kw,
+                    timeout_s,
+                    include_domains=None,
+                    topic=topic,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                results2 = list(resp2.get("results") or [])
+                results = _merge_tavily_results(results, results2)
+                used_open_fallback = True
+            min_words = int(os.environ.get("TAVILY_MIN_WORDS", "100"))
             min_relevance = float(os.environ.get("TAVILY_MIN_RELEVANCE", "1.0"))
             rel_filtered = _rank_and_filter_by_relevance(
                 results,
@@ -453,9 +647,15 @@ def run_search(
             max_keep = 3
             # Per-keyword minimum keep: default 1 (global min/max will handle overall coverage).
             min_keep = int(os.environ.get("TAVILY_MIN_KEEP", "1"))
+            if used_open_fallback:
+                trusted_for_filter = set()
+            elif include_domains:
+                trusted_for_filter = trusted
+            else:
+                trusted_for_filter = set()
             filtered = _pick_results_with_ladders(
                 rel_filtered,
-                trusted_domains=trusted,
+                trusted_domains=trusted_for_filter,
                 reference_date=ref_date,
                 min_words=min_words,
                 max_keep=max_keep,
@@ -470,7 +670,9 @@ def run_search(
                 r2["_kw"] = kw
                 picked_results.append(r2)
                 all_candidates.append(r2)
-            cache.set(ck, {"answer": answer, "picked_results": picked_results})
+            # Avoid caching empty picks; otherwise we can get stuck with empty context.
+            if picked_results:
+                cache.set(ck, {"answer": answer, "picked_results": picked_results})
         except Exception as e:  # noqa: BLE001
             _LOG.warning("tavily_search_failed", job_id=job_id, keyword=kw, error=str(e))
 
@@ -481,6 +683,33 @@ def run_search(
         min_total=min_total,
         max_total=max_total,
     )
+
+    # Retry once with a relaxed fetch if we still don't reach minimum.
+    if client is not None and len(picked_global) < min_total and keywords:
+        fallback2_days = int(os.environ.get("TAVILY_MAX_AGE_DAYS_FALLBACK2", "183"))
+        per_kw_answer2, cand2 = _refetch_relaxed_candidates(
+            client=client,
+            keywords=[str(x) for x in keywords if str(x).strip()],
+            payload=payload,
+            timeout_s=timeout_s,
+            ref_date=ref_date,
+            fallback2_days=fallback2_days,
+        )
+        if per_kw_answer2:
+            per_kw_answer.update(per_kw_answer2)
+        all_candidates = _merge_tavily_results(all_candidates, cand2)
+        picked_global = _pick_global_results(
+            all_candidates,
+            min_total=min_total,
+            max_total=max_total,
+        )
+        # If still cannot reach min_total, accept at least 1 if available.
+        if len(picked_global) < min_total and all_candidates:
+            picked_global = _pick_global_results(
+                all_candidates,
+                min_total=1,
+                max_total=max_total,
+            )
 
     by_kw: dict[str, list[dict[str, Any]]] = {}
     for r in picked_global:

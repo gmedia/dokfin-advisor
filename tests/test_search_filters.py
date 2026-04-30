@@ -242,6 +242,36 @@ def test_filter_parses_url_date_and_drops_old_when_metadata_missing() -> None:
     assert "20260410" in out[0]["url"]
 
 
+def test_filter_parses_id_date_from_snippet_when_url_has_no_date() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://tempo.co/x",
+            "title": "Yogyakarta Bangkitkan Pariwisata Lewat UMKM Kuliner",
+            "content": "8 April 2021 | 16.02 WIB. " + ("word " * 200),
+            "score": 0.9,
+        },
+        {
+            "url": "https://tempo.co/y",
+            "title": "Yogyakarta Bangkitkan Pariwisata Lewat UMKM Kuliner",
+            "content": "10 April 2026 | 21.18 WIB. " + ("word " * 200),
+            "score": 0.1,
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=183),
+        drop_undated=False,
+    )
+    assert len(out) == 1
+    assert out[0]["url"].endswith("/y")
+
+
 def test_filter_prefers_diverse_root_domains() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()

@@ -64,6 +64,53 @@ def _parse_date_from_url(url: str) -> date | None:
     return None
 
 
+_ID_MONTHS: dict[str, int] = {
+    "januari": 1,
+    "februari": 2,
+    "maret": 3,
+    "april": 4,
+    "mei": 5,
+    "juni": 6,
+    "juli": 7,
+    "agustus": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
+    "desember": 12,
+}
+
+
+def _parse_date_from_text(text: str) -> date | None:
+    """Parse publish date from common Indonesian date strings in snippets."""
+    if not text:
+        return None
+    t = text.lower()
+
+    # Example: "8 April 2021 | 16.02 WIB"
+    m = re.search(
+        r"\b(\d{1,2})\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s+(\d{4})\b",
+        t,
+    )
+    if m:
+        try:
+            d = int(m.group(1))
+            mo = _ID_MONTHS[m.group(2)]
+            y = int(m.group(3))
+            return date(y, mo, d)
+        except (KeyError, ValueError):
+            return None
+
+    # Example: "10 April 2026" without time
+    m = re.search(r"\b(\d{1,2})\s+([a-z]+)\s+(\d{4})\b", t)
+    if m and m.group(2) in _ID_MONTHS:
+        try:
+            return date(int(m.group(3)), _ID_MONTHS[m.group(2)], int(m.group(1)))
+        except ValueError:
+            return None
+
+    return None
+
+
 def _parse_published_date(raw: Any) -> date | None:
     if raw is None:
         return None
@@ -91,12 +138,18 @@ def _published_raw(result: dict[str, Any]) -> Any:
 
 
 def published_date_for_result(result: dict[str, Any]) -> date | None:
-    """Best-effort publish date: metadata first, then parse from URL."""
+    """Best-effort publish date: metadata first, then parse from URL/snippet."""
     pub = _parse_published_date(_published_raw(result))
     if pub is not None:
         return pub
     url = str(result.get("url") or "")
-    return _parse_date_from_url(url)
+    pub = _parse_date_from_url(url)
+    if pub is not None:
+        return pub
+    # Last resort: parse from snippet text (some sites omit metadata and non-dated URLs).
+    title = str(result.get("title") or "")
+    content = str(result.get("content") or "")
+    return _parse_date_from_text(f"{title}\n{content}")
 
 
 def _word_count(text: str) -> int:

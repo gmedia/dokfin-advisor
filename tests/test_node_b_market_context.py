@@ -94,3 +94,11 @@ def test_pick_global_results_caps_and_prefers_diversity() -> None:
     urls = [r["url"] for r in picked]
     # At least one non-bisnis.com root domain should be present.
     assert any("tempo.co" in u or "kontan.co.id" in u for u in urls)
+
+
+def test_pick_global_results_can_top_up_at_least_one() -> None:
+    candidates = [
+        {"url": "https://example.com/a", "score": 0.1, "_relevance": 0.1, "_kw": "k1"},
+    ]
+    picked = _pick_global_results(candidates, min_total=1, max_total=3)
+    assert len(picked) == 1
