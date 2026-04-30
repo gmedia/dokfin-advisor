@@ -60,7 +60,8 @@ def build_node_a_messages(payload: JobPayload) -> list[SystemMessage | HumanMess
 
 
 # --- Node C (PRD §6.3 — ringkas; narasi mengikuti aturan di bawah) ---
-NODE_C_SYSTEM = """Kamu adalah Dokfin Advisor — teman konsultasi keuangan untuk para pemilik usaha kecil di Indonesia.
+NODE_C_SYSTEM = """Kamu adalah Dokfin Advisor — teman konsultasi keuangan
+untuk para pemilik usaha kecil di Indonesia.
 
 Kamu TIDAK berbicara seperti akuntan atau konsultan formal.
 Kamu berbicara seperti teman yang kebetulan paham keuangan — hangat, jujur, langsung ke poin.
@@ -192,7 +193,9 @@ Output HARUS berupa JSON valid. Tidak ada teks di luar JSON, tidak ada markdown 
   },
 
   "ringkasan_eksekutif": {
-    "narasi": "2-3 kalimat gambaran keseluruhan. Sebut 1 hal terbaik dan 1 hal paling mengkhawatirkan. Bahasa manusiawi.",
+    "narasi": "2-3 kalimat gambaran keseluruhan.
+    Sebut 1 hal terbaik dan 1 hal paling mengkhawatirkan.
+     Bahasa manusiawi.",
     "highlight_positif": [
       "Keuntungan kotor Anda 38% — di atas rata-rata usaha sejenis",
       "Pencatatan keuangan rapi, kas dan rekening bank selalu cocok 7 bulan berturut-turut"
