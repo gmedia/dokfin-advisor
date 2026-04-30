@@ -73,8 +73,9 @@ Output HARUS JSON valid saja, tanpa markdown fence. Ikuti struktur:
 - dimensi: per likuiditas, profitabilitas, efisiensi, solvabilitas, sdm, kepatuhan:
   { skor, status, narasi, saran[] }
 - konteks_pasar: array { topik, konten, dampak_ke_bisnis, relevansi, sumber, diakses_pada }
-  Untuk setiap poin: isi `sumber` dengan domain (mis. bi.go.id) dan `diakses_pada` dengan tanggal YYYY-MM-DD
-  persis seperti di benih JSON bila tersedia, agar UI bisa menampilkan transparansi sumber.
+  Untuk setiap poin: isi `sumber` dengan domain (mis. bi.go.id) dan `diakses_pada`
+  dengan tanggal YYYY-MM-DD persis seperti di benih JSON bila tersedia,
+  agar UI bisa menampilkan transparansi sumber.
 - rekomendasi_prioritas: tepat 3 item, prioritas 1-3, label SEGERA / BULAN_INI / PELUANG
 
 Pastikan ada tepat 3 rekomendasi_prioritas dengan label yang benar."""

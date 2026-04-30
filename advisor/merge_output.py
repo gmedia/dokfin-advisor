@@ -50,7 +50,10 @@ def _normalize_sumber(s: str | None) -> str:
     return h
 
 
-def merge_konteks_pasar_transparency(out: dict[str, Any], seed: list[dict[str, Any]] | None) -> None:
+def merge_konteks_pasar_transparency(
+    out: dict[str, Any],
+    seed: list[dict[str, Any]] | None,
+) -> None:
     """Isi / perkaya konteks_pasar dengan sumber dan tanggal akses dari Node B."""
     if not seed:
         return

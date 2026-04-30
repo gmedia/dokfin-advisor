@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
 
@@ -67,7 +67,7 @@ def filter_tavily_results(
     min_words: int = 100,
     max_age: timedelta = timedelta(days=183),
 ) -> list[dict[str, Any]]:
-    """Buang hasil terlalu tua, terlalu pendek, di luar whitelist; urutkan by score; ambil max_keep."""
+    """Buang hasil terlalu tua, pendek, atau di luar whitelist; urut score; ambil max_keep."""
     cutoff = reference_date - max_age
     scored: list[tuple[float, dict[str, Any]]] = []
 

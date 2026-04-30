@@ -1,0 +1,27 @@
+# Shared defaults for dokfin-advisor pipelines (image, cache, uv bootstrap).
+# If jobs stay "pending", set default.tags below to match the runner (e.g. docker, dokfin).
+
+default:
+  image: python:3.12-slim-bookworm
+  tags:
+    - dokfin
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  UV_CACHE_DIR: "$CI_PROJECT_DIR/.cache/uv"
+
+cache:
+  key:
+    files:
+      - uv.lock
+  paths:
+    - .cache/uv
+
+stages:
+  - lint
+  - test
+
+.uv_setup:
+  before_script:
+    - pip install --no-cache-dir "uv>=0.5"
+    - uv sync --frozen --all-groups

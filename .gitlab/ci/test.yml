@@ -1,0 +1,5 @@
+test:
+  stage: test
+  extends: .uv_setup
+  script:
+    - uv run pytest -q --tb=short

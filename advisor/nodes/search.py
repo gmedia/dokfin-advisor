@@ -16,7 +16,7 @@ from tenacity import Retrying, retry_if_exception, stop_after_attempt, wait_fixe
 from advisor.cache import MemoryTTLCache, cache_key_for_keyword
 from advisor.logging_setup import get_logger, log_node_timing
 from advisor.search_filters import filter_tavily_results, hostname_from_url
-from advisor.trusted_domains import trusted_domains_for_tavily, trusted_domain_set
+from advisor.trusted_domains import trusted_domain_set, trusted_domains_for_tavily
 
 _LOG = get_logger(__name__)
 _default_cache = MemoryTTLCache()
@@ -92,7 +92,9 @@ def _seeds_from_results(filtered: list[dict[str, Any]], access_date: str) -> lis
             {
                 "topik": (title or host)[:200],
                 "konten": content[:1200],
-                "dampak_ke_bisnis": "Korelasikan dampak dengan kondisi operasional UMKM (data sekunder).",
+                "dampak_ke_bisnis": (
+                    "Korelasikan dampak dengan kondisi operasional UMKM (data sekunder)."
+                ),
                 "relevansi": "TINGGI",
                 "sumber": host,
                 "diakses_pada": access_date,
