@@ -96,3 +96,32 @@ def test_merge_clears_konteks_pasar_when_no_seed() -> None:
         konteks_pasar_seed=None,
     )
     assert merged["konteks_pasar"] == []
+
+
+def test_merge_kepatuhan_saran_picks_forward_looking_single() -> None:
+    payload = JobPayload.model_validate(json.loads(FIXTURE_MIN.read_text(encoding="utf-8")))
+    dim = payload.dimensi.model_dump(mode="json")
+    skor_pd = skor_from_payload_dimensi(dim)
+    skor_k = hitung_skor_keseluruhan(skor_pd)
+    raw: dict = {
+        "dimensi": {
+            "kepatuhan": {
+                "skor": 0,
+                "status": "KRITIS",
+                "narasi": "x",
+                "saran": [
+                    "Simpan bukti bayar di folder digital.",
+                    "Dokumentasikan SOP pencatatan untuk persiapan ajukan kredit bank.",
+                ],
+            }
+        }
+    }
+    merged = merge_deterministic_into_raw(
+        payload=payload,
+        skor_per_dimensi=skor_pd,
+        skor_keseluruhan=skor_k,
+        raw=raw,
+    )
+    saran = merged["dimensi"]["kepatuhan"]["saran"]
+    assert isinstance(saran, list) and len(saran) == 1
+    assert "sop" in saran[0].lower() or "bank" in saran[0].lower() or "kredit" in saran[0].lower()

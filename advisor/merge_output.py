@@ -28,6 +28,39 @@ def _normalize_sumber(s: str | None) -> str:
     return h
 
 
+def _pick_forward_looking_saran(saran: list[str]) -> str:
+    """Pick one suggestion deterministically; prefer forward-looking wording."""
+    if not saran:
+        return ""
+    weights: list[tuple[int, str]] = [
+        (3, "sop"),
+        (3, "panduan"),
+        (3, "prosedur"),
+        (2, "audit"),
+        (2, "pemeriksaan"),
+        (2, "kredit"),
+        (2, "bank"),
+        (2, "pinjaman"),
+        (2, "buka cabang"),
+        (2, "ekspansi"),
+    ]
+
+    best_idx = 0
+    best_score = -1
+    for i, text in enumerate(saran):
+        t = str(text).lower()
+        score = 0
+        for w, kw in weights:
+            if kw in t:
+                score += w
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    if best_score <= 0:
+        return str(saran[0])
+    return str(saran[best_idx])
+
+
 def merge_konteks_pasar_transparency(
     out: dict[str, Any],
     seed: list[dict[str, Any]] | None,
@@ -119,6 +152,13 @@ def merge_deterministic_into_raw(
             row["narasi"] = ""
         if "saran" not in row or not isinstance(row["saran"], list):
             row["saran"] = []
+        # Kepatuhan skor sempurna: cukup 1 saran proaktif (bukan checklist basic).
+        if key == "kepatuhan" and row["status"] == "SEHAT" and float(row["skor"]) >= 10.0:
+            saran = [str(x) for x in row["saran"] if str(x).strip()]
+            if len(saran) > 1:
+                row["saran"] = [_pick_forward_looking_saran(saran)]
+            else:
+                row["saran"] = saran
         dim_out[key] = row
 
     out["dimensi"] = dim_out
