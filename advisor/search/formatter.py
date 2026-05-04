@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from advisor.search_filters import hostname_from_url, published_date_for_result
+from advisor.search_filters import hostname_from_url
 from advisor.trusted_domains import is_indonesia_domain
 
 
@@ -51,9 +50,6 @@ def build_market_context(
 def build_seeds(
     picked: list[dict[str, Any]],
     access_date: str,
-    *,
-    reference_dt: datetime,
-    primary_days: int,
 ) -> list[dict[str, Any]]:
     """Bangun list konteks_pasar_seed dari hasil yang sudah dipilih."""
     seeds = []
@@ -62,13 +58,6 @@ def build_seeds(
         host = hostname_from_url(url) or "unknown"
         title = str(r.get("title") or "").strip()
         content = str(r.get("content") or "")
-        pub = published_date_for_result(r)
-
-        if pub is not None:
-            age_days = (reference_dt.date() - pub).days
-            if age_days > primary_days:
-                content = f"Catatan: artikel dari {pub.isoformat()}. " + content
-
         seeds.append({
             "topik": (title or host)[:200],
             "konten": content[:1200],

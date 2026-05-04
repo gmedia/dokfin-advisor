@@ -154,12 +154,7 @@ def run_search(
     )
 
     market_context = build_market_context(picked, answers_by_kw)
-    seeds = build_seeds(
-        picked,
-        ref_dt.date().isoformat(),
-        reference_dt=ref_dt,
-        primary_days=cfg["primary_days"],
-    )
+    seeds = build_seeds(picked, ref_dt.date().isoformat())
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
     log_node_timing(_LOG, job_id=job_id, node="B", duration_ms=elapsed_ms, keywords=len(enhanced_kws))
