@@ -6,7 +6,8 @@ from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 from advisor.merge_output import merge_konteks_pasar_transparency
-from advisor.nodes.search import _pick_results_with_ladders, _seeds_from_results
+from advisor.search.formatter import build_seeds
+from advisor.search.filtering import filter_and_rank, pick_indonesia_first
 from advisor.search_filters import filter_tavily_results
 
 
@@ -43,8 +44,10 @@ def test_filter_drops_old_and_short() -> None:
         max_keep=3,
         min_words=20,
     )
-    assert len(out) == 1
-    assert "c" in out[0]["url"]
+    # Tanpa max_age: artikel lama tidak dibuang di sisi klien (freshness lewat Tavily ``days``).
+    assert len(out) == 2
+    urls = "".join(r["url"] for r in out)
+    assert "c" in urls and "a" in urls
 
 
 def test_filter_drop_undated_excludes_when_enabled() -> None:
@@ -242,6 +245,66 @@ def test_filter_parses_url_date_and_drops_old_when_metadata_missing() -> None:
     assert "20260410" in out[0]["url"]
 
 
+def test_filter_parses_id_date_from_snippet_when_url_has_no_date() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://tempo.co/x",
+            "title": "Yogyakarta Bangkitkan Pariwisata Lewat UMKM Kuliner",
+            "content": "8 April 2021 | 16.02 WIB. " + ("word " * 200),
+            "score": 0.9,
+        },
+        {
+            "url": "https://tempo.co/y",
+            "title": "Yogyakarta Bangkitkan Pariwisata Lewat UMKM Kuliner",
+            "content": "10 April 2026 | 21.18 WIB. " + ("word " * 200),
+            "score": 0.1,
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=183),
+        drop_undated=False,
+    )
+    assert len(out) == 1
+    assert out[0]["url"].endswith("/y")
+
+
+def test_filter_parses_kontan_style_date_from_snippet() -> None:
+    ref = date(2026, 4, 30)
+    trusted: set[str] = set()
+    results = [
+        {
+            "url": "https://investasi.kontan.co.id/news/a",
+            "title": "Emiten Restoran dan Gerai F&B Diproyeksi Raup Cuan Gede Tahun Ini",
+            "content": "Kamis, 05 Januari 2023 / 05:15 WIB. " + ("word " * 200),
+            "score": 0.9,
+        },
+        {
+            "url": "https://industri.kontan.co.id/news/b",
+            "title": "Erajaya (ERAA) Optimalkan Potensi Ritel, Lifestyle, dan F&B 2026",
+            "content": "Senin, 05 Januari 2026 / 19:36 WIB. " + ("word " * 200),
+            "score": 0.1,
+        },
+    ]
+    out = filter_tavily_results(
+        results,
+        trusted_domains=trusted,
+        reference_date=ref,
+        max_keep=3,
+        min_words=20,
+        max_age=timedelta(days=183),
+        drop_undated=False,
+    )
+    assert len(out) == 1
+    assert out[0]["url"].endswith("/b")
+
+
 def test_filter_prefers_diverse_root_domains() -> None:
     ref = date(2026, 4, 30)
     trusted: set[str] = set()
@@ -323,10 +386,12 @@ def test_merge_fills_diakses_pada_from_seed() -> None:
             "relevansi": "TINGGI",
             "sumber": "bi.go.id",
             "diakses_pada": "2026-04-30",
+            "diterbitkan_pada": "2026-04-10",
         }
     ]
     merge_konteks_pasar_transparency(out, seed)
     assert out["konteks_pasar"][0]["diakses_pada"] == "2026-04-30"
+    assert out["konteks_pasar"][0]["diterbitkan_pada"] == "2026-04-10"
 
 
 def test_merge_empty_kp_uses_seed() -> None:
@@ -374,85 +439,45 @@ def test_merge_replaces_llm_non_hostname_sources_with_seed() -> None:
     assert out["konteks_pasar"][0]["diakses_pada"] == "2026-04-30"
 
 
-def test_seed_labels_stale_when_using_fallback_window() -> None:
+def test_build_seeds_labels_stale_content() -> None:
     ref_dt = datetime(2026, 4, 30, tzinfo=UTC)
-    filtered = [
+    picked = [
         {
             "url": "https://kontan.co.id/read/20260112/x/y",
             "title": "T",
             "content": "isi konten",
         }
     ]
-    seeds = _seeds_from_results(
-        filtered,
+    seeds = build_seeds(
+        picked,
         "2026-04-30",
-        reference_date=ref_dt,
+        reference_dt=ref_dt,
         primary_days=30,
     )
-    assert seeds[0]["konten"].startswith("Catatan: sumber dipublikasikan 2026-01-12")
+    assert seeds[0]["konten"].startswith("Catatan: artikel dari 2026-01-12")
 
 
-def test_pick_results_tops_up_to_min_keep_across_ladders() -> None:
-    ref = date(2026, 4, 30)
-    trusted: set[str] = set()
-    results = [
-        {
-            "url": "https://kontan.co.id/read/20260425/a/a",
-            "title": "New",
-            "content": "word " * 80,
-            "score": 0.9,
-            "published_date": "2026-04-25",
-        },
-        {
-            "url": "https://kompas.com/read/20260112/b/b",
-            "title": "Old",
-            "content": "word " * 80,
-            "score": 0.8,
-            "published_date": "2026-01-12",
-        },
+def test_pick_indonesia_first_returns_diverse_domains() -> None:
+    candidates = [
+        {"url": "https://kontan.co.id/read/20260425/a/a", "title": "New A", "content": "isi a"},
+        {"url": "https://kompas.com/read/20260112/b/b", "title": "Old B", "content": "isi b"},
     ]
-    out = _pick_results_with_ladders(
-        results,
-        trusted_domains=trusted,
-        reference_date=ref,
-        min_words=20,
-        max_keep=3,
-        min_keep=2,
-        ladder_days=[30, 60, 183],
-    )
+    out = pick_indonesia_first(candidates, max_total=3)
     assert len(out) == 2
     urls = {r["url"] for r in out}
-    assert "20260425" in "".join(urls)
-    assert "20260112" in "".join(urls)
+    assert any("kontan" in u for u in urls)
+    assert any("kompas" in u for u in urls)
 
 
-def test_pick_results_allows_same_root_domain_as_last_resort() -> None:
-    ref = date(2026, 4, 30)
-    trusted: set[str] = set()
-    results = [
-        {
-            "url": "https://semarang.bisnis.com/read/20260425/a/a",
-            "title": "A",
-            "content": "word " * 80,
-            "score": 0.9,
-            "published_date": "2026-04-25",
-        },
-        {
-            "url": "https://investasi.bisnis.com/read/20260112/b/b",
-            "title": "B",
-            "content": "word " * 80,
-            "score": 0.8,
-            "published_date": "2026-01-12",
-        },
+def test_pick_indonesia_first_deduplicates_same_root_domain() -> None:
+    candidates = [
+        {"url": "https://semarang.bisnis.com/read/20260425/a/a", "title": "A", "content": "isi"},
+        {"url": "https://investasi.bisnis.com/read/20260112/b/b", "title": "B", "content": "isi"},
+        {"url": "https://kontan.co.id/read/20260430/c/c", "title": "C", "content": "isi"},
     ]
-    out = _pick_results_with_ladders(
-        results,
-        trusted_domains=trusted,
-        reference_date=ref,
-        min_words=20,
-        max_keep=3,
-        min_keep=2,
-        ladder_days=[30, 60, 183],
-    )
-    assert len(out) == 2
-    assert all("bisnis.com" in r["url"] for r in out)
+    out = pick_indonesia_first(candidates, max_total=3)
+    # bisnis.com subdomains share root domain so only one gets picked; kontan gets the other slot
+    urls = [r["url"] for r in out]
+    bisnis_count = sum(1 for u in urls if "bisnis.com" in u)
+    assert bisnis_count <= 1
+    assert any("kontan.co.id" in u for u in urls)

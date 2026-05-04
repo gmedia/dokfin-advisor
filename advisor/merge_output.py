@@ -65,7 +65,7 @@ def merge_konteks_pasar_transparency(
     out: dict[str, Any],
     seed: list[dict[str, Any]] | None,
 ) -> None:
-    """Isi / perkaya konteks_pasar dengan sumber dan tanggal akses dari Node B."""
+    """Isi / perkaya konteks_pasar dengan sumber, tanggal akses, dan tanggal terbit."""
     if not seed:
         return
     kp = out.get("konteks_pasar")
@@ -98,6 +98,8 @@ def merge_konteks_pasar_transparency(
         if src:
             if not item.get("diakses_pada") and src.get("diakses_pada"):
                 item["diakses_pada"] = src["diakses_pada"]
+            if not item.get("diterbitkan_pada") and src.get("diterbitkan_pada"):
+                item["diterbitkan_pada"] = src["diterbitkan_pada"]
             if not item.get("sumber") and src.get("sumber"):
                 item["sumber"] = src["sumber"]
         else:

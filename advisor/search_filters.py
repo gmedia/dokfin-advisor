@@ -1,4 +1,9 @@
-"""Filter hasil Tavily: usia artikel, panjang teks, ranking (Node B)."""
+"""Filter hasil Tavily: panjang/kualitas teks, whitelist host, ranking (Node B).
+
+Filter tanggal publikasi sisi klien bersifat opsional: gunakan argumen ``max_age``
+jika masih ingin membatasi usia artikel; secara default tidak memfilter tanggal
+(karena freshness sudah diatur lewat parameter Tavily, mis. ``days``).
+"""
 
 from __future__ import annotations
 
@@ -7,6 +12,27 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlparse
+
+DOMAIN_BLACKLIST: frozenset[str] = frozenset(
+    {
+        "linkedin.com",
+        "facebook.com",
+        "twitter.com",
+        "x.com",
+        "instagram.com",
+        "tiktok.com",
+        "youtube.com",
+        "reddit.com",
+        "quora.com",
+    }
+)
+
+_LOGIN_WALL_SIGNALS: tuple[str, ...] = (
+    "sign in",
+    "log in",
+    "session_redirect",
+    "/uas/login",
+)
 
 
 def hostname_from_url(url: str) -> str:
@@ -64,6 +90,51 @@ def _parse_date_from_url(url: str) -> date | None:
     return None
 
 
+_ID_MONTHS: dict[str, int] = {
+    "januari": 1,
+    "februari": 2,
+    "maret": 3,
+    "april": 4,
+    "mei": 5,
+    "juni": 6,
+    "juli": 7,
+    "agustus": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
+    "desember": 12,
+}
+
+
+def _parse_date_from_text(text: str) -> date | None:
+    """Parse publish date from common Indonesian date strings in snippets."""
+    if not text:
+        return None
+    t = text.lower()
+
+    # Example: "Kamis, 05 Januari 2023 / 05:15 WIB"
+    # Example: "8 April 2021 | 16.02 WIB"
+    weekday = r"(?:senin|selasa|rabu|kamis|jumat|sabtu|minggu)"
+    month = (
+        r"(?:januari|februari|maret|april|mei|juni|juli|agustus|september|"
+        r"oktober|november|desember)"
+    )
+    m = re.search(
+        rf"\b(?:{weekday}\s*,\s*)?(?P<day>\d{{1,2}})\s+(?P<month>{month})\s+(?P<year>\d{{4}})\b",
+        t,
+    )
+    if m:
+        try:
+            d = int(m.group("day"))
+            mo = _ID_MONTHS[m.group("month")]
+            y = int(m.group("year"))
+            return date(y, mo, d)
+        except (KeyError, ValueError):
+            return None
+
+    return None
+
+
 def _parse_published_date(raw: Any) -> date | None:
     if raw is None:
         return None
@@ -91,12 +162,17 @@ def _published_raw(result: dict[str, Any]) -> Any:
 
 
 def published_date_for_result(result: dict[str, Any]) -> date | None:
-    """Best-effort publish date: metadata first, then parse from URL."""
+    """Best-effort publish date: metadata first, then parse from URL/snippet."""
     pub = _parse_published_date(_published_raw(result))
     if pub is not None:
         return pub
     url = str(result.get("url") or "")
-    return _parse_date_from_url(url)
+    pub = _parse_date_from_url(url)
+    if pub is not None:
+        return pub
+    title = str(result.get("title") or "")
+    content = str(result.get("content") or "")
+    return _parse_date_from_text(f"{title}\n{content}")
 
 
 def _word_count(text: str) -> int:
@@ -172,6 +248,98 @@ def _env_drop_undated() -> bool:
     return os.environ.get("TAVILY_DROP_UNDATED", "0").strip().lower() in ("1", "true", "yes")
 
 
+def is_valid_result(result: dict[str, Any]) -> bool:
+    """Return False for blacklisted domains, login walls, short content, or PDF titles."""
+    url = str(result.get("url") or "")
+    title = str(result.get("title") or "")
+    content = str(result.get("content") or "").strip()
+
+    host = hostname_from_url(url)
+    root = root_domain_from_host(host)
+    if root in DOMAIN_BLACKLIST or host in DOMAIN_BLACKLIST:
+        return False
+
+    content_lower = content.lower()
+    if any(signal in content_lower for signal in _LOGIN_WALL_SIGNALS):
+        return False
+
+    if len(content) < 200:
+        return False
+
+    return not title.strip().upper().startswith("[PDF]")
+
+
+def truncate_content(content: str, max_chars: int = 500) -> str:
+    """Truncate at last sentence boundary within max_chars; hard truncate as fallback."""
+    if len(content) <= max_chars:
+        return content
+    chunk = content[:max_chars]
+    for sep in (".", "!", "?"):
+        idx = chunk.rfind(sep)
+        if idx > max_chars // 2:
+            return chunk[: idx + 1]
+    return chunk + "..."
+
+
+def get_root_domain(url: str) -> str:
+    """Extract root domain from a URL (e.g. 'semarang.bisnis.com' → 'bisnis.com')."""
+    return root_domain_from_host(hostname_from_url(url))
+
+
+def diversify_results(
+    results: list[dict[str, Any]],
+    max_per_domain: int = 1,
+) -> list[dict[str, Any]]:
+    """Keep at most max_per_domain articles per root domain, preserving relevance order."""
+    seen: dict[str, int] = {}
+    out: list[dict[str, Any]] = []
+    for r in results:
+        url = str(r.get("url") or "")
+        root = get_root_domain(url) or url
+        count = seen.get(root, 0)
+        if count < max_per_domain:
+            seen[root] = count + 1
+            out.append(r)
+    return out
+
+
+def score_relevance(result: dict[str, Any], industry: str, city: str) -> int:
+    """Integer relevance score; returns -1 (hard reject) for irrelevant articles."""
+    title = str(result.get("title") or "")
+    content = str(result.get("content") or "")
+    url = str(result.get("url") or "")
+    text = f"{title} {content} {url}".lower()
+
+    reject_keywords = (
+        "penjualan mobil",
+        "industri otomotif",
+        "gaikindo",
+        "industri rokok",
+        "industri tembakau",
+        "pandemi covid",
+        "logistik ekspor",
+    )
+    if any(kw in text for kw in reject_keywords):
+        return -1
+
+    positive_keywords = (
+        "umkm",
+        "restoran",
+        "f&b",
+        "fnb",
+        "makanan",
+        "minuman",
+        "industri",
+        "konsumen",
+    )
+    score = sum(1 for kw in positive_keywords if kw in text)
+    if city and city.lower() in text:
+        score += 1
+    if industry and industry.lower() in text:
+        score += 1
+    return score
+
+
 def filter_tavily_results(
     results: list[dict[str, Any]],
     *,
@@ -179,13 +347,17 @@ def filter_tavily_results(
     reference_date: date,
     max_keep: int = 3,
     min_words: int = 100,
-    max_age: timedelta = timedelta(days=183),
+    max_age: timedelta | None = None,
     drop_undated: bool | None = None,
 ) -> list[dict[str, Any]]:
-    """Buang hasil terlalu tua, pendek, atau di luar whitelist; urut score; ambil max_keep."""
+    """Buang hasil pendek/berkualitas rendah atau di luar whitelist; urut score; ambil max_keep.
+
+    Jika ``max_age`` tidak None, hasil dengan tanggal terbit lebih lama dari cutoff dibuang.
+    Jika ``max_age`` None (default), tidak ada filter tanggal di sisi klien.
+    """
     if drop_undated is None:
         drop_undated = _env_drop_undated()
-    cutoff = reference_date - max_age
+    cutoff = (reference_date - max_age) if max_age is not None else None
     scored: list[tuple[float, dict[str, Any]]] = []
 
     for r in results:
@@ -206,7 +378,7 @@ def filter_tavily_results(
         pub = published_date_for_result(r)
         if drop_undated and pub is None:
             continue
-        if pub is not None and pub < cutoff:
+        if cutoff is not None and pub is not None and pub < cutoff:
             continue
         score = float(r.get("score") or 0.0)
         score += _freshness_bonus(content, pub, reference_date=reference_date)
