@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import calendar
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 POLICY_SALT = "v3-indonesia|topic=general|country=indonesia"
@@ -27,17 +26,15 @@ def get_search_config() -> dict[str, Any]:
     }
 
 
-def date_range_for_periode(periode_tahun: int, periode_bulan: int) -> tuple[str, str]:
+def date_range_for_search(primary_days: int = 90) -> tuple[str, str]:
     """
-    Hitung start/end date untuk Tavily berdasarkan periode analisis.
+    Hitung start/end date untuk Tavily.
 
-    Strategi: awal tahun analisis → akhir bulan analisis (capped ke hari ini).
+    Strategi: selalu gunakan window dari hari ini ke belakang (primary_days).
+    Konteks pasar harus relevan dengan kondisi pasar saat ini, bukan periode analisis
+    historis — karena rekomendasi yang dihasilkan harus actionable sekarang.
     Returns: (start_date, end_date) sebagai string ISO YYYY-MM-DD.
     """
-    start = date(periode_tahun, 1, 1)
-    last_day = calendar.monthrange(periode_tahun, periode_bulan)[1]
-    end = date(periode_tahun, periode_bulan, last_day)
     today = date.today()
-    if end > today:
-        end = today
-    return start.isoformat(), end.isoformat()
+    start = today - timedelta(days=primary_days)
+    return start.isoformat(), today.isoformat()

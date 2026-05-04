@@ -386,12 +386,10 @@ def test_merge_fills_diakses_pada_from_seed() -> None:
             "relevansi": "TINGGI",
             "sumber": "bi.go.id",
             "diakses_pada": "2026-04-30",
-            "diterbitkan_pada": "2026-04-10",
         }
     ]
     merge_konteks_pasar_transparency(out, seed)
     assert out["konteks_pasar"][0]["diakses_pada"] == "2026-04-30"
-    assert out["konteks_pasar"][0]["diterbitkan_pada"] == "2026-04-10"
 
 
 def test_merge_empty_kp_uses_seed() -> None:

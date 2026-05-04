@@ -98,8 +98,6 @@ def merge_konteks_pasar_transparency(
         if src:
             if not item.get("diakses_pada") and src.get("diakses_pada"):
                 item["diakses_pada"] = src["diakses_pada"]
-            if not item.get("diterbitkan_pada") and src.get("diterbitkan_pada"):
-                item["diterbitkan_pada"] = src["diterbitkan_pada"]
             if not item.get("sumber") and src.get("sumber"):
                 item["sumber"] = src["sumber"]
         else:

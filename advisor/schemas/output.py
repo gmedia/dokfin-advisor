@@ -93,7 +93,6 @@ class KonteksPasarItem(BaseModel):
     relevansi: str
     sumber: str | None = None
     diakses_pada: str | None = None
-    diterbitkan_pada: str | None = None
 
 
 class RekomendasiPrioritasItem(BaseModel):

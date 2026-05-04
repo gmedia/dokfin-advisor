@@ -76,6 +76,5 @@ def build_seeds(
             "relevansi": "TINGGI" if is_indonesia_domain(url) else "MEDIUM",
             "sumber": host,
             "diakses_pada": access_date,
-            "diterbitkan_pada": (pub.isoformat() if pub is not None else None),
         })
     return seeds

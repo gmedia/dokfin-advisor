@@ -18,7 +18,7 @@ from advisor.cache import MemoryTTLCache, cache_key_for_keyword
 from advisor.logging_setup import get_logger, log_node_timing
 from advisor.schemas.input import JobPayload
 from advisor.search.client import make_tavily_client, search_indonesia
-from advisor.search.config import POLICY_SALT, date_range_for_periode, get_search_config
+from advisor.search.config import POLICY_SALT, date_range_for_search, get_search_config
 from advisor.search.filtering import filter_and_rank, pick_indonesia_first
 from advisor.search.formatter import build_market_context, build_seeds
 from advisor.search.keywords import enhance_keywords
@@ -53,9 +53,9 @@ def run_search(
     ref_dt = datetime.now(UTC)
     t0 = time.perf_counter()
 
-    # Hitung date range dari periode analisis payload
+    # Date range selalu dari hari ini ke belakang — konteks pasar harus actionable sekarang
     pb = payload.profil_bisnis
-    start_date, end_date = date_range_for_periode(pb.periode_tahun, pb.periode_bulan)
+    start_date, end_date = date_range_for_search(cfg["primary_days"])
 
     # Expand keywords dengan variasi konteks Indonesia
     enhanced_kws: list[tuple[str, str]] = []
