@@ -89,7 +89,7 @@ class KonteksPasarItem(BaseModel):
 
     topik: str
     konten: str
-    dampak_ke_bisnis: str
+    dampak_ke_bisnis: str | None = None
     relevansi: str
     sumber: str | None = None
     diakses_pada: str | None = None
