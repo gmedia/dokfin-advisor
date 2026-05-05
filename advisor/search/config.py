@@ -18,8 +18,11 @@ def get_search_config() -> dict[str, Any]:
         "min_words": int(os.environ.get("TAVILY_MIN_WORDS", "80")),
         "primary_days": int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "90")),
         "min_relevance": float(os.environ.get("TAVILY_MIN_RELEVANCE", "0.5")),
-        "force_indonesia_only": os.environ.get("TAVILY_FORCE_INDONESIA", "1").strip() in (
-            "1", "true", "yes",
+        "force_indonesia_only": os.environ.get("TAVILY_FORCE_INDONESIA", "1").strip()
+        in (
+            "1",
+            "true",
+            "yes",
         ),
         "konteks_pasar_min": int(os.environ.get("TAVILY_KONTEKS_PASAR_MIN_TOTAL", "2")),
         "konteks_pasar_max": int(os.environ.get("TAVILY_KONTEKS_PASAR_MAX_TOTAL", "5")),

@@ -80,19 +80,46 @@ def trusted_domain_set() -> set[str]:
 _GOV_PATTERNS: tuple[str, ...] = (".go.id", ".mil.id", ".desa.id")
 
 _ID_PATTERNS: tuple[str, ...] = (
-    ".co.id", ".or.id", ".ac.id", ".sch.id",
-    ".web.id", ".biz.id", ".my.id", ".id",
+    ".co.id",
+    ".or.id",
+    ".ac.id",
+    ".sch.id",
+    ".web.id",
+    ".biz.id",
+    ".my.id",
+    ".id",
 )
 
 _ALL_ID_PATTERNS: tuple[str, ...] = _GOV_PATTERNS + _ID_PATTERNS
 
 # Known Indonesian media that use international TLDs (.com, .net, etc.)
 _KNOWN_ID_MEDIA: tuple[str, ...] = (
-    "kompas", "detik", "tempo", "kontan", "bisnis", "cnnindonesia",
-    "liputan6", "merdeka", "okezone", "tribun", "suara", "republika",
-    "antara", "viva", "medcom", "inews", "beritasatu", "sindonews",
-    "harianjogja", "krjogja", "radarjogja", "solopos", "jpnn",
-    "cnbcindonesia", "katadata", "wartaekonomi",
+    "kompas",
+    "detik",
+    "tempo",
+    "kontan",
+    "bisnis",
+    "cnnindonesia",
+    "liputan6",
+    "merdeka",
+    "okezone",
+    "tribun",
+    "suara",
+    "republika",
+    "antara",
+    "viva",
+    "medcom",
+    "inews",
+    "beritasatu",
+    "sindonews",
+    "harianjogja",
+    "krjogja",
+    "radarjogja",
+    "solopos",
+    "jpnn",
+    "cnbcindonesia",
+    "katadata",
+    "wartaekonomi",
 )
 
 

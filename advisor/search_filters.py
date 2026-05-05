@@ -54,8 +54,6 @@ def root_domain_from_host(host: str) -> str:
     return ".".join(labels[-2:])
 
 
-
-
 def is_valid_result(result: dict[str, Any]) -> bool:
     """Return False for blacklisted domains, login walls, short content, or PDF titles."""
     url = str(result.get("url") or "")

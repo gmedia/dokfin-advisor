@@ -9,8 +9,13 @@ from advisor.search_filters import hostname_from_url, is_valid_result, root_doma
 from advisor.trusted_domains import indonesia_domain_score, is_indonesia_domain
 
 _INTERNATIONAL_MARKERS: tuple[str, ...] = (
-    "apac", "asia pacific", "asean", "southeast asia",
-    "global market", "worldwide", "international market",
+    "apac",
+    "asia pacific",
+    "asean",
+    "southeast asia",
+    "global market",
+    "worldwide",
+    "international market",
 )
 
 _CITY_ALIASES: dict[str, list[str]] = {
@@ -28,10 +33,12 @@ _CITY_ALIASES: dict[str, list[str]] = {
 
 def is_international_only(result: dict[str, Any]) -> bool:
     """Return True jika konten murni internasional tanpa konteks Indonesia."""
-    combined = " ".join([
-        str(result.get("title") or ""),
-        str(result.get("content") or ""),
-    ]).lower()
+    combined = " ".join(
+        [
+            str(result.get("title") or ""),
+            str(result.get("content") or ""),
+        ]
+    ).lower()
     url = str(result.get("url") or "")
 
     has_international = any(m in combined for m in _INTERNATIONAL_MARKERS)
