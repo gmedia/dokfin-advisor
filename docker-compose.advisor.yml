@@ -1,0 +1,36 @@
+# Override file untuk dev: gabungkan advisor ke stack Laravel yang sudah jalan.
+#
+# Cara pakai (dari folder backend/Laravel):
+#   docker compose -f docker-compose.yml -f /path/to/dokfin-advisor/docker-compose.advisor.yml up -d
+#
+# Atau copy file ini ke folder backend, lalu:
+#   docker compose -f docker-compose.yml -f docker-compose.advisor.yml up -d
+#
+# Advisor akan join network `dokfin` yang sudah ada dan pakai NATS + Redis dari stack Laravel.
+
+name: dokfin-dev
+
+services:
+  advisor:
+    build:
+      context: .
+    container_name: dokfin_advisor
+    env_file:
+      - .env
+    environment:
+      NATS_URL: nats://nats:4222
+      REDIS_URL: redis://redis:6379/0
+      NATS_CONSUMER_DURABLE: dokfin-advisor
+      ADVISOR_MAX_CONCURRENCY: "3"
+    networks:
+      - dokfin
+    depends_on:
+      - nats
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import advisor; print('ok')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
