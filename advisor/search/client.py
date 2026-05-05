@@ -46,7 +46,7 @@ def search_indonesia(
     *,
     start_date: str,
     end_date: str,
-    max_results: int = 6,
+    max_results: int = 3,
     search_depth: str = "advanced",
     timeout_s: float = 35.0,
     include_domains: list[str] | None = None,

@@ -13,7 +13,7 @@ def get_search_config() -> dict[str, Any]:
     """Load search configuration from environment variables."""
     return {
         "timeout_s": float(os.environ.get("TAVILY_TIMEOUT_S", "35")),
-        "max_results": int(os.environ.get("TAVILY_FETCH_MAX_RESULTS", "6")),
+        "max_results": int(os.environ.get("TAVILY_FETCH_MAX_RESULTS", "3")),
         "search_depth": os.environ.get("TAVILY_SEARCH_DEPTH", "advanced"),
         "min_words": int(os.environ.get("TAVILY_MIN_WORDS", "80")),
         "primary_days": int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "90")),
