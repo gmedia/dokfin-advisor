@@ -54,7 +54,6 @@ def run_search(
     t0 = time.perf_counter()
 
     # Date range selalu dari hari ini ke belakang — konteks pasar harus actionable sekarang
-    pb = payload.profil_bisnis
     start_date, end_date = date_range_for_search(cfg["primary_days"])
 
     # Expand keywords dengan variasi konteks Indonesia
@@ -157,7 +156,13 @@ def run_search(
     seeds = build_seeds(picked, ref_dt.date().isoformat())
 
     elapsed_ms = (time.perf_counter() - t0) * 1000
-    log_node_timing(_LOG, job_id=job_id, node="B", duration_ms=elapsed_ms, keywords=len(enhanced_kws))
+    log_node_timing(
+        _LOG,
+        job_id=job_id,
+        node="B",
+        duration_ms=elapsed_ms,
+        keywords=len(enhanced_kws),
+    )
 
     return {
         "market_context": market_context,

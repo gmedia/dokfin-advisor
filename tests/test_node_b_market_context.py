@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from advisor.search.filtering import filter_and_rank, pick_indonesia_first
 from advisor.schemas.input import JobPayload
+from advisor.search.filtering import filter_and_rank, pick_indonesia_first
 
 
 def _payload_fnb_jogja() -> JobPayload:

@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
+from advisor.schemas.input import JobPayload, ProfilBisnis
 from advisor.search.filtering import is_international_only, relevance_score
 from advisor.search.keywords import enhance_keywords
 from advisor.trusted_domains import (
-    _ALL_ID_PATTERNS as ALL_ID_PATTERNS,
     indonesia_domain_score,
     is_indonesia_domain,
 )
-from advisor.schemas.input import JobPayload, ProfilBisnis
 
 
 def _make_payload(
@@ -19,7 +17,7 @@ def _make_payload(
     kota: str = "Jakarta",
 ) -> JobPayload:
     """Create a test payload with all required fields."""
-    from advisor.schemas.input import JobDimensions, IndikatorRow, IndikatorStatus
+    from advisor.schemas.input import IndikatorRow, IndikatorStatus, JobDimensions
     
     dummy_indikator = {"DUMMY_01": IndikatorRow(status=IndikatorStatus.SEHAT)}
     
