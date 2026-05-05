@@ -58,13 +58,14 @@ def build_seeds(
         host = hostname_from_url(url) or "unknown"
         title = str(r.get("title") or "").strip()
         content = str(r.get("content") or "")
+        sumber = url if url else host
         seeds.append(
             {
                 "topik": (title or host)[:200],
                 "konten": content[:1200],
                 "dampak_ke_bisnis": None,
                 "relevansi": "TINGGI" if is_indonesia_domain(url) else "MEDIUM",
-                "sumber": host,
+                "sumber": sumber,
                 "diakses_pada": access_date,
             }
         )
