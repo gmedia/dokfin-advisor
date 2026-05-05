@@ -1,0 +1,24 @@
+deploy prod:
+  stage: deploy
+  image: curlimages/curl:latest
+  tags:
+    - dokfin
+  environment:
+    name: prod
+  before_script: []
+  script:
+    - |
+      curl --fail --silent --show-error \
+        --request POST \
+        --form token=$DEPLOYMENT_TOKEN \
+        --form ref=$CI_COMMIT_TAG \
+        --form "variables[APP_IMAGE_TAG]=$CI_COMMIT_TAG" \
+        --form "variables[APP_COMMIT_SHA]=$CI_COMMIT_SHORT_SHA" \
+        --form "variables[APP_REPO]=$CI_PROJECT_PATH" \
+        --form "variables[DEPLOY_APP]=advisor" \
+        "https://gitlab.com/api/v4/projects/$DEPLOYMENT_PROJECT_ID/trigger/pipeline"
+  interruptible: false
+  dependencies: []
+  retry: 2
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/

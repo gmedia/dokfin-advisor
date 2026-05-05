@@ -20,6 +20,7 @@ cache:
 stages:
   - lint
   - test
+  - deploy
 
 .uv_setup:
   before_script:
