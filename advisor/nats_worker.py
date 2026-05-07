@@ -239,7 +239,7 @@ async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
         while True:
             try:
                 msgs = await sub.fetch(fetch_batch, timeout=fetch_timeout)
-            except FetchTimeoutError:
+            except (FetchTimeoutError, nats.errors.TimeoutError):
                 continue
             await asyncio.gather(*(process_one(m) for m in msgs))
     finally:
