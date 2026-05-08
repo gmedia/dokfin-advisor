@@ -172,7 +172,7 @@ async def handle_job_message(
                 await js.publish(
                     subject_dlq,
                     _serialize_for_nats(
-                    {"body": json.dumps(dlq.model_dump(mode="json"), ensure_ascii=False)}
+                        {"body": json.dumps(dlq.model_dump(mode="json"), ensure_ascii=False)}
                     ),
                     timeout=pub_timeout,
                 )
