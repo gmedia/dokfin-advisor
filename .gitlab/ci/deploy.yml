@@ -11,8 +11,9 @@ deploy prod:
       curl --fail --silent --show-error \
         --request POST \
         --form token=$DEPLOYMENT_TOKEN \
-        --form ref=$CI_COMMIT_TAG \
+        --form ref=main \
         --form "variables[DEPLOY_APP]=advisor" \
+        --form "variables[APP_IMAGE_TAG]=$CI_COMMIT_TAG" \
         "https://gitlab.com/api/v4/projects/$DEPLOYMENT_PROJECT_ID/trigger/pipeline"
   interruptible: false
   dependencies: []
