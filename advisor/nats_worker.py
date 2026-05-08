@@ -145,7 +145,11 @@ async def handle_job_message(
 
         pub_timeout = float(_env("NATS_REQUEST_TIMEOUT_S", "30"))
         try:
-            await js.publish(subject_results, _serialize_for_nats({"body": json.dumps(result, ensure_ascii=False)}), timeout=pub_timeout)
+            await js.publish(
+                subject_results,
+                _serialize_for_nats({"body": json.dumps(result, ensure_ascii=False)}),
+                timeout=pub_timeout,
+            )
         except Exception as e:  # noqa: BLE001
             _LOG.error("publish_results_failed", error=str(e), job_id=job_id_str)
             await msg.nak()
@@ -167,7 +171,9 @@ async def handle_job_message(
             try:
                 await js.publish(
                     subject_dlq,
-                    _serialize_for_nats({"body": json.dumps(dlq.model_dump(mode="json"), ensure_ascii=False)}),
+                    _serialize_for_nats(
+                    {"body": json.dumps(dlq.model_dump(mode="json"), ensure_ascii=False)}
+                    ),
                     timeout=pub_timeout,
                 )
             except Exception as e:  # noqa: BLE001
