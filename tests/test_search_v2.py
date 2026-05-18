@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from advisor.schemas.input import JobPayload, ProfilBisnis
+from advisor.search.config import get_search_config
 from advisor.search.filtering import is_international_only, relevance_score
-from advisor.search.keywords import build_search_queries, enhance_keywords
+from advisor.search.keywords import build_search_queries, enhance_keywords, score_search_keyword
 from advisor.trusted_domains import (
     indonesia_domain_score,
     is_indonesia_domain,
@@ -218,19 +219,64 @@ class TestKeywordEnhancement:
 
         queries = build_search_queries(
             [
-                "kondisi likuiditas UMKM restoran Indonesia 2026",
                 "tren penjualan restoran Yogyakarta 2026",
+                "benchmark margin f&b retail yogyakarta 2026",
             ],
             payload,
             max_keywords=1,
+            selection_mode="best",
         )
 
         assert queries == [
             (
-                "kondisi likuiditas UMKM restoran Indonesia 2026",
-                "kondisi likuiditas UMKM restoran Indonesia 2026",
+                "tren penjualan restoran Yogyakarta 2026",
+                "tren penjualan restoran Yogyakarta 2026",
             )
         ]
+
+    def test_best_keyword_scoring_prefers_actionable_sales_query_over_benchmark(self):
+        payload = _make_payload(industri="F&B Retail", kota="Yogyakarta")
+
+        sales_score = score_search_keyword("tren penjualan restoran Yogyakarta 2026", payload)
+        benchmark_score = score_search_keyword(
+            "benchmark margin f&b retail yogyakarta 2026",
+            payload,
+        )
+
+        assert sales_score > benchmark_score
+
+    def test_best_keyword_scoring_uses_payload_industry_terms(self):
+        payload = _make_payload(
+            industri="Jasa Laundry",
+            sub_industri="Laundry Kiloan",
+            kota="Bandung",
+        )
+
+        laundry_score = score_search_keyword("tren penjualan laundry kiloan Bandung 2026", payload)
+        restaurant_score = score_search_keyword("tren penjualan restoran Bandung 2026", payload)
+
+        assert laundry_score > restaurant_score
+
+    def test_search_config_supports_max_queries_alias(self, monkeypatch):
+        monkeypatch.setenv("SEARCH_MAX_QUERIES", "1")
+        monkeypatch.setenv("SEARCH_QUERY_SELECTION_MODE", "best")
+        monkeypatch.setenv("SEARCH_ENHANCEMENT_ENABLED", "false")
+
+        cfg = get_search_config()
+
+        assert cfg["max_keywords"] == 1
+        assert cfg["query_selection_mode"] == "best"
+        assert cfg["enable_enhancement"] is False
+
+    def test_search_config_defaults_to_one_best_query(self, monkeypatch):
+        monkeypatch.delenv("SEARCH_MAX_QUERIES", raising=False)
+        monkeypatch.delenv("SEARCH_MAX_KEYWORDS", raising=False)
+        monkeypatch.delenv("SEARCH_QUERY_SELECTION_MODE", raising=False)
+
+        cfg = get_search_config()
+
+        assert cfg["max_keywords"] == 1
+        assert cfg["query_selection_mode"] == "best"
 
 
 class TestRelevanceScoring:

@@ -60,6 +60,7 @@ def run_search(
         original_keywords,
         payload,
         max_keywords=cfg["max_keywords"],
+        selection_mode=cfg["query_selection_mode"],
         enable_enhancement=cfg["enable_enhancement"],
         max_enhanced_total=cfg["max_enhanced_total"],
     )
@@ -69,6 +70,8 @@ def run_search(
         job_id=job_id,
         original_keywords=len(original_keywords),
         search_queries=len(search_queries),
+        max_queries=cfg["max_keywords"],
+        query_selection_mode=cfg["query_selection_mode"],
         enhancement_enabled=cfg["enable_enhancement"],
         max_enhanced_total=cfg["max_enhanced_total"],
         start_date=start_date,

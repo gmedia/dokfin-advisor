@@ -9,12 +9,29 @@ from typing import Any
 POLICY_SALT = "v3-indonesia|topic=general|country=indonesia"
 
 
+def _env_first(*names: str, default: str) -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value not in (None, ""):
+            return value
+    return default
+
+
+def _env_bool(*names: str, default: str = "0") -> bool:
+    return _env_first(*names, default=default).strip().lower() in ("1", "true", "yes")
+
+
 def get_search_config() -> dict[str, Any]:
     """Load search configuration from environment variables."""
     return {
-        "max_keywords": int(os.environ.get("SEARCH_MAX_KEYWORDS", "3")),
-        "enable_enhancement": os.environ.get("SEARCH_ENABLE_ENHANCEMENT", "0").strip().lower()
-        in ("1", "true", "yes"),
+        "max_keywords": int(_env_first("SEARCH_MAX_QUERIES", "SEARCH_MAX_KEYWORDS", default="1")),
+        "query_selection_mode": os.environ.get("SEARCH_QUERY_SELECTION_MODE", "best")
+        .strip()
+        .lower(),
+        "enable_enhancement": _env_bool(
+            "SEARCH_ENHANCEMENT_ENABLED",
+            "SEARCH_ENABLE_ENHANCEMENT",
+        ),
         "max_enhanced_total": int(os.environ.get("SEARCH_MAX_ENHANCED_TOTAL", "0")),
         "timeout_s": float(os.environ.get("TAVILY_TIMEOUT_S", "35")),
         "max_results": int(os.environ.get("TAVILY_FETCH_MAX_RESULTS", "5")),
