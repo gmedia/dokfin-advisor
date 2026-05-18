@@ -91,3 +91,51 @@ def enhance_keywords(keyword: str, payload: JobPayload) -> list[str]:
             result.append(kw.strip())
 
     return result[:4]
+
+
+def build_search_queries(
+    keywords: list[str],
+    payload: JobPayload,
+    *,
+    max_keywords: int = 3,
+    enable_enhancement: bool = False,
+    max_enhanced_total: int = 0,
+) -> list[tuple[str, str]]:
+    """
+    Build final Tavily queries as (original_keyword, query).
+
+    Default produksi sengaja hemat: pakai keyword Node A apa adanya. Enhancement hanya
+    ditambahkan saat diaktifkan via env, dan dibatasi global agar 3 keyword tidak melebar
+    menjadi banyak request Tavily.
+    """
+    seen_originals: set[str] = set()
+    originals: list[str] = []
+    for raw in keywords:
+        kw = str(raw).strip()
+        norm = kw.lower()
+        if not kw or norm in seen_originals:
+            continue
+        seen_originals.add(norm)
+        originals.append(kw)
+        if len(originals) >= max(1, max_keywords):
+            break
+
+    final: list[tuple[str, str]] = [(kw, kw) for kw in originals]
+    if not enable_enhancement or max_enhanced_total <= 0:
+        return final
+
+    seen_queries = {kw.lower() for kw in originals}
+    enhanced_count = 0
+    for original in originals:
+        for variant in enhance_keywords(original, payload)[1:]:
+            variant = variant.strip()
+            norm = variant.lower()
+            if not variant or norm in seen_queries:
+                continue
+            final.append((original, variant))
+            seen_queries.add(norm)
+            enhanced_count += 1
+            if enhanced_count >= max_enhanced_total:
+                return final
+
+    return final

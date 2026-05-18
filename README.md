@@ -66,7 +66,7 @@ Lihat [`.env.example`](.env.example) untuk daftar lengkap. Ringkasan:
 | Area | Variabel utama |
 |------|---------------|
 | LLM | `LLM_PROVIDER`, `OPENAI_API_KEY` / `GOOGLE_API_KEY`, `*_MODEL_*` |
-| Tavily | `TAVILY_API_KEY`, `TAVILY_FETCH_MAX_RESULTS`, `TAVILY_MIN_RELEVANCE` |
+| Tavily | `TAVILY_API_KEY`, `SEARCH_MAX_KEYWORDS`, `SEARCH_ENABLE_ENHANCEMENT`, `SEARCH_MAX_ENHANCED_TOTAL`, `TAVILY_FETCH_MAX_RESULTS`, `TAVILY_INCLUDE_ANSWER`, `TAVILY_MIN_RELEVANCE` |
 | NATS | `NATS_URL`, `NATS_STREAM_*`, `NATS_SUBJECT_*`, `ADVISOR_MAX_CONCURRENCY` |
 | Idempotensi | `REDIS_URL`, `ADVISOR_IDEMPOTENCY_*` |
 | Estimasi biaya | `OPENAI_PRICE_*_PER_M_IDR` / `GOOGLE_PRICE_*_PER_M_IDR` |
@@ -84,4 +84,3 @@ Lihat [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 ## Lisensi
 
 [MIT](LICENSE) — Copyright © 2026 PT Media Sarana Data (GMEDIA)
-

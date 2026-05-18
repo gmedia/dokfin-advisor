@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from advisor.schemas.input import JobPayload, ProfilBisnis
 from advisor.search.filtering import is_international_only, relevance_score
-from advisor.search.keywords import enhance_keywords
+from advisor.search.keywords import build_search_queries, enhance_keywords
 from advisor.trusted_domains import (
     indonesia_domain_score,
     is_indonesia_domain,
@@ -179,6 +179,58 @@ class TestKeywordEnhancement:
         assert any("indonesia" in kw.lower() for kw in keywords)
         # Original keyword should be preserved
         assert any("f&b" in kw.lower() or "likuiditas" in kw.lower() for kw in keywords)
+
+    def test_build_search_queries_defaults_to_original_keywords_only(self):
+        payload = _make_payload(industri="F&B Retail", kota="Yogyakarta")
+
+        queries = build_search_queries(
+            [
+                "tren penjualan restoran Yogyakarta 2026",
+                "kondisi likuiditas UMKM restoran Indonesia 2026",
+                "strategi meningkatkan penjualan restoran UMKM 2026",
+            ],
+            payload,
+        )
+
+        assert len(queries) == 3
+        assert queries == [(kw, kw) for kw, _query in queries]
+
+    def test_build_search_queries_caps_enhancement_globally(self):
+        payload = _make_payload(industri="F&B Retail", kota="Yogyakarta")
+
+        queries = build_search_queries(
+            [
+                "tren penjualan restoran Yogyakarta 2026",
+                "kondisi likuiditas UMKM restoran Indonesia 2026",
+                "strategi meningkatkan penjualan restoran UMKM 2026",
+            ],
+            payload,
+            enable_enhancement=True,
+            max_enhanced_total=1,
+        )
+
+        assert len(queries) == 4
+        assert queries[:3] == [(kw, kw) for kw, _query in queries[:3]]
+        assert queries[3][0] in {kw for kw, _query in queries[:3]}
+
+    def test_build_search_queries_can_use_one_best_keyword(self):
+        payload = _make_payload(industri="F&B Retail", kota="Yogyakarta")
+
+        queries = build_search_queries(
+            [
+                "kondisi likuiditas UMKM restoran Indonesia 2026",
+                "tren penjualan restoran Yogyakarta 2026",
+            ],
+            payload,
+            max_keywords=1,
+        )
+
+        assert queries == [
+            (
+                "kondisi likuiditas UMKM restoran Indonesia 2026",
+                "kondisi likuiditas UMKM restoran Indonesia 2026",
+            )
+        ]
 
 
 class TestRelevanceScoring:

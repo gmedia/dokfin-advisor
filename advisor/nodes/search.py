@@ -21,7 +21,7 @@ from advisor.search.client import make_tavily_client, search_indonesia
 from advisor.search.config import POLICY_SALT, date_range_for_search, get_search_config
 from advisor.search.filtering import filter_and_rank, pick_indonesia_first
 from advisor.search.formatter import build_market_context, build_seeds
-from advisor.search.keywords import enhance_keywords
+from advisor.search.keywords import build_search_queries
 from advisor.search_filters import is_valid_result
 from advisor.trusted_domains import is_indonesia_domain
 
@@ -56,17 +56,21 @@ def run_search(
     # Date range selalu dari hari ini ke belakang — konteks pasar harus actionable sekarang
     start_date, end_date = date_range_for_search(cfg["primary_days"])
 
-    # Expand keywords dengan variasi konteks Indonesia
-    enhanced_kws: list[tuple[str, str]] = []
-    for kw in original_keywords:
-        for variant in enhance_keywords(kw, payload):
-            enhanced_kws.append((kw, variant))
+    search_queries = build_search_queries(
+        original_keywords,
+        payload,
+        max_keywords=cfg["max_keywords"],
+        enable_enhancement=cfg["enable_enhancement"],
+        max_enhanced_total=cfg["max_enhanced_total"],
+    )
 
     _LOG.info(
         "search_start",
         job_id=job_id,
         original_keywords=len(original_keywords),
-        enhanced_keywords=len(enhanced_kws),
+        search_queries=len(search_queries),
+        enhancement_enabled=cfg["enable_enhancement"],
+        max_enhanced_total=cfg["max_enhanced_total"],
         start_date=start_date,
         end_date=end_date,
     )
@@ -75,7 +79,7 @@ def run_search(
     answers_by_kw: dict[str, str] = {}
     all_candidates: list[dict[str, Any]] = []
 
-    for orig_kw, kw in enhanced_kws:
+    for orig_kw, kw in search_queries:
         ck = cache_key_for_keyword(kw, policy_salt=POLICY_SALT)
         cached = cache.get(ck)
 
@@ -100,6 +104,7 @@ def run_search(
                 end_date=end_date,
                 max_results=cfg["max_results"],
                 search_depth=cfg["search_depth"],
+                include_answer=cfg["include_answer"],
                 timeout_s=cfg["timeout_s"],
             )
 
@@ -161,7 +166,7 @@ def run_search(
         job_id=job_id,
         node="B",
         duration_ms=elapsed_ms,
-        keywords=len(enhanced_kws),
+        keywords=len(search_queries),
     )
 
     return {

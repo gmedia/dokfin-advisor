@@ -48,6 +48,7 @@ def search_indonesia(
     end_date: str,
     max_results: int = 3,
     search_depth: str = "advanced",
+    include_answer: bool = False,
     timeout_s: float = 35.0,
     include_domains: list[str] | None = None,
     extra_exclude_domains: list[str] | None = None,
@@ -58,7 +59,7 @@ def search_indonesia(
     Parameter kritis:
     - topic="general"       → wajib agar country filter aktif
     - country="indonesia"   → nama lengkap (bukan "id")
-    - include_answer="advanced" → AI summary yang lebih baik
+    - include_answer opsional → default off untuk mengurangi latensi
     - start_date/end_date   → date range presisi (bukan 'days')
     - search_depth="advanced" → lebih banyak sumber ditemukan
     """
@@ -70,7 +71,7 @@ def search_indonesia(
                 "query": query,
                 "topic": "general",
                 "country": "indonesia",
-                "include_answer": "advanced",
+                "include_answer": "advanced" if include_answer else False,
                 "search_depth": search_depth,
                 "max_results": max_results,
                 "start_date": start_date,

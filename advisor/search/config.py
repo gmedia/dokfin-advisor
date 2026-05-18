@@ -12,9 +12,15 @@ POLICY_SALT = "v3-indonesia|topic=general|country=indonesia"
 def get_search_config() -> dict[str, Any]:
     """Load search configuration from environment variables."""
     return {
+        "max_keywords": int(os.environ.get("SEARCH_MAX_KEYWORDS", "3")),
+        "enable_enhancement": os.environ.get("SEARCH_ENABLE_ENHANCEMENT", "0").strip().lower()
+        in ("1", "true", "yes"),
+        "max_enhanced_total": int(os.environ.get("SEARCH_MAX_ENHANCED_TOTAL", "0")),
         "timeout_s": float(os.environ.get("TAVILY_TIMEOUT_S", "35")),
-        "max_results": int(os.environ.get("TAVILY_FETCH_MAX_RESULTS", "3")),
+        "max_results": int(os.environ.get("TAVILY_FETCH_MAX_RESULTS", "5")),
         "search_depth": os.environ.get("TAVILY_SEARCH_DEPTH", "basic"),
+        "include_answer": os.environ.get("TAVILY_INCLUDE_ANSWER", "0").strip().lower()
+        in ("1", "true", "yes", "advanced", "basic"),
         "min_words": int(os.environ.get("TAVILY_MIN_WORDS", "80")),
         "primary_days": int(os.environ.get("TAVILY_MAX_AGE_DAYS_PRIMARY", "90")),
         "min_relevance": float(os.environ.get("TAVILY_MIN_RELEVANCE", "0.5")),

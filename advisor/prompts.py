@@ -108,6 +108,12 @@ ATURAN BAHASA — WAJIB DIIKUTI
    SALAH: "Stok barang Anda menumpuk cukup banyak"
    BENAR: "Ada {nilai_idr} stok barang yang belum terjual lebih dari sebulan"
 
+   PENTING UNTUK ANGKA PASAR:
+   Jangan menyebut benchmark pasar berbentuk angka spesifik jika angka itu tidak muncul
+   di DATA PASAR TERKINI. Jika tidak ada benchmark angka dari sumber pasar, pakai kalimat umum.
+   Contoh aman:
+   "Secara umum, usaha lebih aman jika aset lancarnya lebih besar dari tagihan dekat waktu."
+
 3. KALIMAT PENDEK
    Maksimal 25 kata per kalimat.
    Jika perlu penjelasan panjang, pecah jadi beberapa kalimat.
