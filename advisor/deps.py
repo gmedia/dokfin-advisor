@@ -22,6 +22,8 @@ class AdvisorDeps:
     invoke_llm_c: Callable[[list[BaseMessage]], str]
     tavily_client: TavilyClient | None = None
     cache: Any | None = None  # MemoryTTLCache
+    llm_provider: str = "openai"
     model_name_a: str = "gpt-4o-mini"
     model_name_c: str = "gpt-4o"
     token_usage: TokenUsageAccumulator | None = None
+    payload_overridable: bool = False

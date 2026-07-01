@@ -20,11 +20,22 @@ from advisor.nodes.search import run_search
 from advisor.nodes.synthesize import make_synthesize_node
 from advisor.nodes.validate import validate_node
 from advisor.retry_llm import MAX_LLM_ATTEMPTS
-from advisor.schemas.input import JobPayload
+from advisor.schemas.input import JobPayload, LlmConfig
 from advisor.schemas.output import AdvisorResultFailed, ErrorCode
 from advisor.scoring import hitung_skor_keseluruhan, skor_from_payload_dimensi
 
 _LOG = get_logger(__name__)
+_SHARED_RUNTIME_CACHE: Any | None = None
+
+
+def _runtime_cache() -> Any:
+    """Shared in-process Tavily cache for production deps built per job."""
+    global _SHARED_RUNTIME_CACHE
+    if _SHARED_RUNTIME_CACHE is None:
+        from advisor.cache import MemoryTTLCache
+
+        _SHARED_RUNTIME_CACHE = MemoryTTLCache()
+    return _SHARED_RUNTIME_CACHE
 
 
 def merge_telemetry_into_result(deps: AdvisorDeps, result: dict[str, Any]) -> dict[str, Any]:
@@ -36,7 +47,7 @@ def merge_telemetry_into_result(deps: AdvisorDeps, result: dict[str, Any]) -> di
     tu = acc.to_token_usage()
     if tu:
         out["token_usage"] = tu.model_dump(mode="json")
-    prov = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
+    prov = deps.llm_provider
     cost = estimate_cost_idr(
         acc,
         model_a=deps.model_name_a,
@@ -130,16 +141,32 @@ def _llm_timeout_s(*, google: bool) -> float:
     return float(os.environ.get("OPENAI_TIMEOUT_S", "120"))
 
 
-def _build_openai_deps() -> AdvisorDeps:
+def _provider_from_payload_or_env(llm: LlmConfig | None) -> str:
+    provider = (
+        llm.provider.value if llm and llm.provider else os.environ.get("LLM_PROVIDER", "openai")
+    )
+    provider = provider.strip().lower()
+    if provider in ("gemini", "genai"):
+        return "google"
+    return provider
+
+
+def _build_openai_deps(
+    *,
+    model_a: str | None = None,
+    model_c: str | None = None,
+    tavily_client: Any | None = None,
+    cache: Any | None = None,
+    payload_overridable: bool = False,
+) -> AdvisorDeps:
     """ChatOpenAI; requires OPENAI_API_KEY."""
 
     from langchain_openai import ChatOpenAI
 
-    from advisor.cache import MemoryTTLCache
     from advisor.llm_usage import TokenUsageAccumulator
 
-    model_a = os.environ.get("OPENAI_MODEL_A", "gpt-4o-mini")
-    model_c = os.environ.get("OPENAI_MODEL_C", "gpt-4o")
+    model_a = model_a or os.environ.get("OPENAI_MODEL_A", "gpt-4o-mini")
+    model_c = model_c or os.environ.get("OPENAI_MODEL_C", "gpt-4o")
     timeout_s = _llm_timeout_s(google=False)
     llm_a = ChatOpenAI(model=model_a, temperature=0, timeout=timeout_s)
     llm_c = ChatOpenAI(model=model_c, temperature=0.2, timeout=timeout_s)
@@ -158,24 +185,32 @@ def _build_openai_deps() -> AdvisorDeps:
     return AdvisorDeps(
         invoke_llm_a=invoke_a,
         invoke_llm_c=invoke_c,
-        tavily_client=None,
-        cache=MemoryTTLCache(),
+        tavily_client=tavily_client,
+        cache=cache if cache is not None else _runtime_cache(),
+        llm_provider="openai",
         model_name_a=model_a,
         model_name_c=model_c,
         token_usage=acc,
+        payload_overridable=payload_overridable,
     )
 
 
-def _build_google_genai_deps() -> AdvisorDeps:
+def _build_google_genai_deps(
+    *,
+    model_a: str | None = None,
+    model_c: str | None = None,
+    tavily_client: Any | None = None,
+    cache: Any | None = None,
+    payload_overridable: bool = False,
+) -> AdvisorDeps:
     """ChatGoogleGenerativeAI; set GOOGLE_API_KEY (atau GEMINI_API_KEY)."""
 
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    from advisor.cache import MemoryTTLCache
     from advisor.llm_usage import TokenUsageAccumulator
 
-    model_a = os.environ.get("GOOGLE_MODEL_A", "gemini-2.0-flash")
-    model_c = os.environ.get("GOOGLE_MODEL_C", "gemini-2.0-flash")
+    model_a = model_a or os.environ.get("GOOGLE_MODEL_A", "gemini-2.0-flash")
+    model_c = model_c or os.environ.get("GOOGLE_MODEL_C", "gemini-2.0-flash")
     timeout_s = _llm_timeout_s(google=True)
     json_mime = "application/json"
     llm_a = ChatGoogleGenerativeAI(
@@ -205,27 +240,69 @@ def _build_google_genai_deps() -> AdvisorDeps:
     return AdvisorDeps(
         invoke_llm_a=invoke_a,
         invoke_llm_c=invoke_c,
-        tavily_client=None,
-        cache=MemoryTTLCache(),
+        tavily_client=tavily_client,
+        cache=cache if cache is not None else _runtime_cache(),
+        llm_provider="google",
         model_name_a=model_a,
         model_name_c=model_c,
         token_usage=acc,
+        payload_overridable=payload_overridable,
+    )
+
+
+def build_deps_for_payload(
+    payload: JobPayload | dict[str, Any],
+    *,
+    base_deps: AdvisorDeps | None = None,
+) -> AdvisorDeps:
+    """Deps produksi dari payload `llm`, dengan environment sebagai fallback."""
+
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    p = payload if isinstance(payload, JobPayload) else JobPayload.model_validate(payload)
+    llm = p.llm
+    provider = _provider_from_payload_or_env(llm)
+    model_a = llm.model_a if llm else None
+    model_c = llm.model_c if llm else None
+    tavily_client = base_deps.tavily_client if base_deps else None
+    cache = base_deps.cache if base_deps else None
+    if provider in ("google", "gemini", "genai"):
+        return _build_google_genai_deps(
+            model_a=model_a,
+            model_c=model_c,
+            tavily_client=tavily_client,
+            cache=cache,
+        )
+    return _build_openai_deps(
+        model_a=model_a,
+        model_c=model_c,
+        tavily_client=tavily_client,
+        cache=cache,
     )
 
 
 def build_default_deps() -> AdvisorDeps:
-    """Deps produksi: OpenAI (default) atau Gemini (`LLM_PROVIDER=google`)."""
+    """Deps produksi fallback dari environment; payload boleh override di `run_advisor`."""
 
     from dotenv import load_dotenv
 
     load_dotenv()
     provider = os.environ.get("LLM_PROVIDER", "openai").strip().lower()
     if provider in ("google", "gemini", "genai"):
-        return _build_google_genai_deps()
-    return _build_openai_deps()
+        return _build_google_genai_deps(payload_overridable=True)
+    return _build_openai_deps(payload_overridable=True)
 
 
-def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
+def _resolve_deps_for_payload(validated: JobPayload, deps: AdvisorDeps | None) -> AdvisorDeps:
+    if deps is None:
+        return build_deps_for_payload(validated)
+    if deps.payload_overridable and validated.llm is not None:
+        return build_deps_for_payload(validated, base_deps=deps)
+    return deps
+
+
+def run_advisor(payload: dict[str, Any], deps: AdvisorDeps | None = None) -> dict[str, Any]:
     """Jalankan graph; return dict DONE atau FAILED (JSON-friendly)."""
     configure_logging()
     try:
@@ -241,6 +318,7 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps) -> dict[str, Any]:
         return failed.model_dump(mode="json")
 
     bind_job_context(job_id=str(validated.job_id))
+    deps = _resolve_deps_for_payload(validated, deps)
 
     if deps.token_usage is not None:
         deps.token_usage.reset()

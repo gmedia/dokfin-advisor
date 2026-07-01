@@ -15,7 +15,7 @@ import structlog
 from nats.js import api
 from nats.js.errors import FetchTimeoutError, NotFoundError
 
-from advisor.graph import AdvisorDeps, build_default_deps, run_advisor
+from advisor.graph import AdvisorDeps, run_advisor
 from advisor.idempotency import (
     connect_redis,
     get_cached_result,
@@ -227,7 +227,7 @@ async def run_nats_worker(*, deps: AdvisorDeps | None = None) -> None:
         max_concurrency=max_conc,
     )
 
-    d = deps if deps is not None else build_default_deps()
+    d = deps
     sem = asyncio.Semaphore(max_conc)
 
     async def process_one(m: Any) -> None:

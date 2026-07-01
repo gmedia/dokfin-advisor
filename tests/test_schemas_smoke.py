@@ -37,6 +37,19 @@ def test_job_payload_accepts_optional_skor_periode_sebelumnya() -> None:
     assert p.profil_bisnis.skor_keseluruhan_periode_sebelumnya == 6.2
 
 
+def test_job_payload_accepts_optional_llm_config() -> None:
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    data["llm"] = {
+        "provider": "google",
+        "model_a": "gemini-2.0-flash",
+        "model_c": "gemini-3.1-pro-preview",
+    }
+    p = JobPayload.model_validate(data)
+    assert p.llm is not None
+    assert p.llm.provider == "google"
+    assert p.llm.model_c == "gemini-3.1-pro-preview"
+
+
 def test_job_id_must_be_uuid_v4() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     data["job_id"] = "6ba7b810-9dad-11d1-80b4-00c04fd430c8"

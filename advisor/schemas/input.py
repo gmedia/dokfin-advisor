@@ -61,6 +61,23 @@ class ProfilBisnis(BaseModel):
     skor_keseluruhan_periode_sebelumnya: float | None = None
 
 
+class LlmProvider(StrEnum):
+    """Provider LLM yang boleh diminta per job."""
+
+    OPENAI = "openai"
+    GOOGLE = "google"
+
+
+class LlmConfig(BaseModel):
+    """Konfigurasi LLM opsional dari Laravel; secret tetap dari environment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: LlmProvider | None = None
+    model_a: str | None = None
+    model_c: str | None = None
+
+
 class JobPayload(BaseModel):
     """Root payload dari Laravel via NATS `bhc.jobs`."""
 
@@ -70,6 +87,7 @@ class JobPayload(BaseModel):
     created_at: datetime
     profil_bisnis: ProfilBisnis
     dimensi: JobDimensions
+    llm: LlmConfig | None = None
 
     @field_validator("job_id")
     @classmethod

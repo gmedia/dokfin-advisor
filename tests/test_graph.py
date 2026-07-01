@@ -125,6 +125,56 @@ def test_graph_happy_path_mocked() -> None:
     assert validated.skor_keseluruhan.vs_periode_lalu is None
 
 
+def test_payload_llm_config_overrides_default_deps(monkeypatch) -> None:
+    payload = _load_payload()
+    payload["llm"] = {
+        "provider": "google",
+        "model_a": "gemini-a",
+        "model_c": "gemini-c",
+    }
+    job_id = payload["job_id"]
+    reasoning = ContextualizeResult(
+        indikator_kritis=["KES_01"],
+        dimensi_terburuk="likuiditas",
+        search_keywords=["tren industri kuliner indonesia"],
+        ada_perishable_kritis=False,
+        flag_data_tidak_lengkap=False,
+    )
+    resolved: dict[str, str] = {}
+
+    def fake_build_deps_for_payload(validated, *, base_deps=None):
+        assert base_deps is fallback_deps
+        resolved["provider"] = validated.llm.provider.value
+        resolved["model_a"] = validated.llm.model_a
+        resolved["model_c"] = validated.llm.model_c
+        return AdvisorDeps(
+            invoke_llm_a=lambda _m: reasoning.model_dump_json(),
+            invoke_llm_c=lambda _m: _done_json(job_id),
+            tavily_client=None,
+            cache=None,
+            llm_provider=validated.llm.provider.value,
+            model_name_a=validated.llm.model_a,
+            model_name_c=validated.llm.model_c,
+        )
+
+    monkeypatch.setattr("advisor.graph.build_deps_for_payload", fake_build_deps_for_payload)
+    fallback_deps = AdvisorDeps(
+        invoke_llm_a=lambda _m: "{}",
+        invoke_llm_c=lambda _m: "{}",
+        payload_overridable=True,
+    )
+
+    out = run_advisor(payload, fallback_deps)
+
+    assert out["status"] == "DONE"
+    assert out["model_used"] == "gemini-c"
+    assert resolved == {
+        "provider": "google",
+        "model_a": "gemini-a",
+        "model_c": "gemini-c",
+    }
+
+
 def test_node_a_json_retry_then_ok() -> None:
     payload = _load_payload()
     job_id = payload["job_id"]

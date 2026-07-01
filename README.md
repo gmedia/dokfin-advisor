@@ -35,7 +35,7 @@ Opsional: Docker + Docker Compose untuk NATS, Redis, dan container advisor.
 ```bash
 uv sync
 cp .env.example .env
-# Wajib: isi LLM_PROVIDER, OPENAI_API_KEY atau GOOGLE_API_KEY, dan TAVILY_API_KEY
+# Wajib: isi OPENAI_API_KEY atau GOOGLE_API_KEY sesuai provider, dan TAVILY_API_KEY
 ```
 
 ## Menjalankan tes dan lint
@@ -65,7 +65,7 @@ Lihat [`.env.example`](.env.example) untuk daftar lengkap. Ringkasan:
 
 | Area | Variabel utama |
 |------|---------------|
-| LLM | `LLM_PROVIDER`, `OPENAI_API_KEY` / `GOOGLE_API_KEY`, `*_MODEL_*` |
+| LLM | Payload `llm.provider/model_a/model_c` sebagai sumber utama; env `LLM_PROVIDER`, `*_MODEL_*`, dan API key sebagai fallback/runtime |
 | Tavily | `TAVILY_API_KEY`, `SEARCH_MAX_QUERIES`, `SEARCH_QUERY_SELECTION_MODE`, `SEARCH_ENHANCEMENT_ENABLED`, `SEARCH_MAX_ENHANCED_TOTAL`, `TAVILY_FETCH_MAX_RESULTS`, `TAVILY_INCLUDE_ANSWER`, `TAVILY_MIN_RELEVANCE` |
 | NATS | `NATS_URL`, `NATS_STREAM_*`, `NATS_SUBJECT_*`, `ADVISOR_MAX_CONCURRENCY` |
 | Idempotensi | `REDIS_URL`, `ADVISOR_IDEMPOTENCY_*` |
@@ -76,6 +76,21 @@ Lihat [`.env.example`](.env.example) untuk daftar lengkap. Ringkasan:
 - Payload contoh: [`tests/fixtures/payload_sample.json`](tests/fixtures/payload_sample.json)
 - Schema input/output: [`advisor/schemas/`](advisor/schemas/)
 - Spesifikasi lengkap: [`PRD.md`](PRD.md)
+
+Payload boleh mengirim konfigurasi model per job:
+
+```json
+{
+  "llm": {
+    "provider": "google",
+    "model_a": "gemini-2.0-flash",
+    "model_c": "gemini-3.1-pro-preview"
+  }
+}
+```
+
+Jika blok `llm` tidak ada, service memakai fallback dari `.env`. API key dan harga token tetap
+dibaca dari env, bukan payload.
 
 ## Kontribusi
 
