@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-dokfin-advisor = "main:main"
+dokfin-advisor = "advisor.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["advisor"]

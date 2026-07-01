@@ -38,6 +38,23 @@ cp .env.example .env
 # Wajib: isi OPENAI_API_KEY atau GOOGLE_API_KEY sesuai provider, dan TAVILY_API_KEY
 ```
 
+## Pakai langsung tanpa NATS
+
+Untuk mencoba satu payload JSON secara langsung:
+
+```bash
+uv run dokfin-advisor analyze tests/fixtures/payload_with_llm.json
+```
+
+Simpan hasil ke file:
+
+```bash
+uv run dokfin-advisor analyze tests/fixtures/payload_with_llm.json -o result.json
+```
+
+Mode ini memakai kontrak payload yang sama dengan Laravel. Blok `llm` di payload akan menentukan
+provider/model per job; API key tetap dibaca dari `.env`.
+
 ## Menjalankan tes dan lint
 
 ```bash
@@ -48,8 +65,10 @@ uv run pytest
 
 ## Mode aplikasi
 
-- **Tanpa `NATS_URL`:** `python main.py` atau `uv run dokfin-advisor` menjalankan demo bootstrap.
-- **Dengan `NATS_URL`:** process menjalankan [`advisor/nats_worker.py`](advisor/nats_worker.py) — konsumsi subject `bhc.jobs`, publish ke `bhc.results`, DLQ ke `bhc.dlq`. Nama stream JetStream tidak boleh mengandung titik (lihat `.env.example`).
+- **Direct CLI:** `uv run dokfin-advisor analyze payload.json` memproses satu payload tanpa NATS.
+- **Tanpa `NATS_URL` dan tanpa argumen:** `python main.py` atau `uv run dokfin-advisor` menjalankan demo bootstrap.
+- **Dengan `NATS_URL` dan tanpa argumen:** process menjalankan [`advisor/nats_worker.py`](advisor/nats_worker.py) — konsumsi subject `bhc.jobs`, publish ke `bhc.results`, DLQ ke `bhc.dlq`. Nama stream JetStream tidak boleh mengandung titik (lihat `.env.example`).
+- **Worker eksplisit:** `uv run dokfin-advisor worker`.
 
 ## Docker Compose
 

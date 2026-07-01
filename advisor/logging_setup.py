@@ -5,26 +5,27 @@ from __future__ import annotations
 import logging
 import os
 import sys
-from typing import Any
+from typing import Any, TextIO
 
 import structlog
 
 _CONFIGURED = False
 
 
-def configure_logging() -> None:
+def configure_logging(*, stream: TextIO | None = None) -> None:
     """Configure structlog + stdlib logging once per process (idempotent)."""
     global _CONFIGURED
     if _CONFIGURED:
         return
     _CONFIGURED = True
+    stream = stream or sys.stdout
 
     level_name = os.environ.get("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
 
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
+        stream=stream,
         level=level,
     )
 
@@ -43,7 +44,7 @@ def configure_logging() -> None:
         ],
         wrapper_class=structlog.make_filtering_bound_logger(level),
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
+        logger_factory=structlog.PrintLoggerFactory(file=stream),
         cache_logger_on_first_use=True,
     )
 
