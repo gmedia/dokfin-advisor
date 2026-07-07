@@ -1,0 +1,110 @@
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "DONE",
+  "generated_at": "2026-07-07T02:43:35Z",
+  "model_used": "gemini-3.1-pro-preview",
+  "token_usage": {
+    "node_a_input": 1202,
+    "node_a_output": 1684,
+    "node_c_input": 5361,
+    "node_c_output": 7263,
+    "total": 15510
+  },
+  "estimated_cost_idr": 2166.65,
+  "processing_time_seconds": 63.378,
+  "skor_keseluruhan": {
+    "nilai": 7.0,
+    "label": "Cukup Sehat",
+    "trend": "tidak_tersedia",
+    "vs_periode_lalu": null
+  },
+  "ringkasan_eksekutif": {
+    "narasi": "Kondisi restoran Anda bulan ini cukup stabil secara keseluruhan. Insight lintas dimensi: Keuntungan kotor Anda sebenarnya bagus, tapi uang kas tergerus karena target penjualan karyawan tidak tercapai dan banyak tagihan menumpuk. Mari kita perbaiki arus kas dan dorong penjualan agar bisnis lebih lega.",
+    "highlight_positif": [
+      "Pencatatan keuangan Anda sangat rapi dan selalu cocok selama 5 bulan berturut-turut",
+      "Pengelolaan bahan baku sangat baik dengan rata-rata stok habis terjual dalam 19 hari"
+    ],
+    "highlight_warning": [
+      "Uang dan aset lancar Anda hanya Rp 92 juta, tidak cukup untuk membayar tagihan Rp 124 juta",
+      "Penjualan bulan ini meleset dari target dengan kekurangan sekitar Rp 25,3 juta"
+    ]
+  },
+  "dimensi": {
+    "likuiditas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Uang dan aset lancar Anda saat ini tidak cukup untuk melunasi semua tagihan jangka pendek. Dari total tagihan Rp 124 juta, Anda baru memiliki aset lancar Rp 92 juta. Selain itu, ada uang Rp 12 juta yang masih tertahan di pelanggan segmen horeka selama rata-rata 28 hari. Secara umum, usaha lebih aman jika aset lancarnya lebih besar dari tagihan dekat waktu. Ke depan, Anda perlu mempercepat penagihan agar uang kas kembali aman.",
+      "saran": [
+        "Hubungi pelanggan segmen horeka minggu ini untuk menagih piutang Rp 12 juta yang sudah mendekati sebulan",
+        "Minta perpanjangan waktu bayar ke supplier bahan baku agar kas harian tidak terlalu mepet"
+      ]
+    },
+    "profitabilitas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Restoran Anda sudah melewati titik impas dengan total penjualan Rp 162 juta bulan ini. Namun, pertumbuhan keuntungan bersih Anda justru turun 12,6% dibandingkan sebelumnya. Ini terjadi karena biaya operasional memakan cukup banyak porsi dari pendapatan Anda. Di industri makanan, menjaga biaya operasional tetap stabil sangat penting saat penjualan sedang turun. Fokuslah menekan pengeluaran yang tidak mendesak bulan depan.",
+      "saran": [
+        "Tunda pembelian barang atau alat baru bulan ini sampai keuntungan bersih kembali naik",
+        "Cek ulang pengeluaran harian restoran dan potong biaya yang tidak langsung berdampak pada rasa makanan"
+      ]
+    },
+    "efisiensi": {
+      "skor": 8.4,
+      "status": "SEHAT",
+      "narasi": "Pengelolaan bahan baku restoran Anda berjalan sangat baik dengan rata-rata stok habis dalam 19 hari. Hanya ada sekitar Rp 8,2 juta stok bumbu dan kemasan yang perputarannya agak lambat. Ini menunjukkan Anda sudah cukup pintar menakar belanja bahan baku harian. Kondisi ini sangat bagus untuk menjaga kualitas makanan tetap segar. Pertahankan kebiasaan belanja yang sudah pas ini.",
+      "saran": [
+        "Buat jadwal rutin mingguan untuk mengecek stok bumbu dan kemasan agar tidak ada yang kedaluwarsa"
+      ]
+    },
+    "solvabilitas": {
+      "skor": 7.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Hutang restoran Anda saat ini mencapai Rp 210 juta, lebih besar dari modal sendiri yang sebesar Rp 125 juta. Ada tagihan sekitar Rp 28 juta yang harus segera Anda bayar dalam 30 hari ke depan. Memiliki hutang lebih besar dari modal bisa berisiko jika penjualan sedang sepi. Pastikan uang dari hasil jualan bulan ini disisihkan dulu untuk membayar tagihan tersebut. Jangan menambah pinjaman baru sampai tagihan bulan ini lunas.",
+      "saran": [
+        "Sisihkan pendapatan harian restoran khusus untuk membayar tagihan Rp 28 juta yang jatuh tempo bulan ini",
+        "Hindari mengambil cicilan alat dapur baru sampai porsi hutang Anda lebih kecil dari modal"
+      ]
+    },
+    "sdm": {
+      "skor": 7.3,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Biaya gaji 8 karyawan Anda mengambil porsi 27,4% dari total penjualan, yang masih tergolong wajar. Sayangnya, tim Anda belum mencapai target penjualan bulan ini dan masih kurang sekitar Rp 25,3 juta. Kekurangan target ini membuat uang kas restoran menjadi lebih seret dari biasanya. Memberikan dorongan semangat atau target harian yang lebih kecil bisa membantu tim fokus. Semoga bulan depan tim bisa mengejar ketertinggalan penjualan ini.",
+      "saran": [
+        "Bagi sisa target Rp 25,3 juta menjadi target harian per karyawan agar terasa lebih mudah dicapai",
+        "Buat promo paket makan siang sederhana untuk membantu karyawan mengejar target penjualan minggu ini"
+      ]
+    },
+    "kepatuhan": {
+      "skor": 10.0,
+      "status": "SEHAT",
+      "narasi": "Catatan keuangan restoran Anda sangat rapi dan selalu seimbang selama 5 bulan terakhir. Anda juga sudah melunasi semua kewajiban pajak tepat waktu tanpa ada denda keterlambatan. Kedisiplinan ini sangat memudahkan Anda jika sewaktu-waktu butuh pinjaman modal dari bank. Usaha yang taat aturan biasanya lebih mudah bertahan dalam jangka panjang. Terus pertahankan kebiasaan mencatat yang baik ini.",
+      "saran": [
+        "Simpan semua bukti bayar pajak dan nota belanja dalam satu map khusus setiap akhir minggu"
+      ]
+    }
+  },
+  "konteks_pasar": [],
+  "rekomendasi_prioritas": [
+    {
+      "prioritas": 1,
+      "label": "SEGERA",
+      "aksi": "Kejar tagihan pelanggan horeka dan siapkan dana bayar hutang",
+      "detail": "Anda punya tagihan jatuh tempo Rp 28 juta bulan ini, sementara uang kas mepet. Segera tagih piutang Rp 12 juta dari pelanggan horeka untuk menambah uang kas.",
+      "estimasi_dampak": "Uang kas bertambah Rp 12 juta untuk membantu melunasi hutang jangka pendek"
+    },
+    {
+      "prioritas": 2,
+      "label": "BULAN_INI",
+      "aksi": "Bagi target penjualan bulanan menjadi target harian per karyawan",
+      "detail": "Penjualan bulan ini kurang Rp 25,3 juta dari target yang ditetapkan. Pecah angka ini jadi target harian agar karyawan lebih fokus berjualan setiap hari.",
+      "estimasi_dampak": "Meningkatkan peluang tercapainya target penjualan dan menambah pemasukan restoran"
+    },
+    {
+      "prioritas": 3,
+      "label": "PELUANG",
+      "aksi": "Buat jadwal rutin pengecekan stok bumbu dan kemasan",
+      "detail": "Pengelolaan bahan baku Anda sudah sangat sehat dan efisien. Jadikan ini standar operasional dengan membuat jadwal cek stok mingguan agar kualitas terjaga.",
+      "estimasi_dampak": "Mencegah kerugian dari bahan baku rusak dan menjaga efisiensi stok tetap di atas 8.0"
+    }
+  ]
+}

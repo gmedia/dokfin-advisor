@@ -1,0 +1,110 @@
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "DONE",
+  "generated_at": "2026-07-07T02:44:13Z",
+  "model_used": "gemini-3.5-flash",
+  "token_usage": {
+    "node_a_input": 1202,
+    "node_a_output": 2294,
+    "node_c_input": 5359,
+    "node_c_output": 5154,
+    "total": 14009
+  },
+  "estimated_cost_idr": 1382.34,
+  "processing_time_seconds": 37.835,
+  "skor_keseluruhan": {
+    "nilai": 7.0,
+    "label": "Cukup Sehat",
+    "trend": "tidak_tersedia",
+    "vs_periode_lalu": null
+  },
+  "ringkasan_eksekutif": {
+    "narasi": "Secara umum, bisnis restoran Anda berada dalam kondisi cukup sehat dengan skor 7,0. Pengelolaan stok barang Anda sangat efisien dan pencatatan keuangan Anda luar biasa rapi. Namun, Anda harus waspada karena uang tunai untuk membayar tagihan jangka pendek saat ini sangat mepet. Insight lintas dimensi: Kegagalan tim penjualan mencapai target sebesar Rp 25,32 juta langsung menekan keuntungan bersih dan mempersempit ruang gerak kas Anda untuk membayar hutang jatuh tempo sebesar Rp 28 juta.",
+    "highlight_positif": [
+      "Pengelolaan stok sangat efisien, rata-rata barang habis terjual dalam 19 hari saja",
+      "Pencatatan keuangan sangat rapi dan selalu cocok antara kas fisik dan bank selama 5 bulan berturut-turut"
+    ],
+    "highlight_warning": [
+      "Aset lancar Rp 92 juta tidak cukup untuk membayar hutang jangka pendek sebesar Rp 124 juta",
+      "Penjualan meleset Rp 25,32 juta dari target, membuat keuntungan bersih menyusut drastis"
+    ]
+  },
+  "dimensi": {
+    "likuiditas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Uang tunai dan aset lancar Anda sebesar Rp 92 juta tidak cukup untuk menutup hutang jangka pendek yang mencapai Rp 124 juta. Artinya, dari setiap Rp 1 tagihan segera, Anda hanya punya Rp 0,74 untuk membayarnya. Untungnya, penagihan piutang Anda cukup cepat, rata-rata lunas dalam 22 hari. Namun, kas harian Anda yang tersisa Rp 4,2 juta sudah sangat mepet untuk operasional harian.",
+      "saran": [
+        "Segera hubungi supplier utama minggu ini untuk meminta perpanjangan tempo bayar dari 30 hari menjadi 45 hari.",
+        "Fokus tagih piutang dari segmen horeka sebesar Rp 12 juta yang rata-rata pembayarannya paling lama, yaitu 28 hari."
+      ]
+    },
+    "profitabilitas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Keuntungan kotor Anda sebenarnya sangat bagus di angka 34,8%. Masalahnya, keuntungan bersih Anda tipis sekali, hanya 8,2% dan terus turun selama 3 bulan terakhir. Bahkan, modal yang Anda putar malah menyusut sebesar 12,6% karena kerugian di tingkat bersih ini. Penjualan aktual Anda sebesar Rp 162 juta juga hanya selisih tipis di atas titik impas sebesar Rp 145 juta.",
+      "saran": [
+        "Pangkas biaya operasional non-bahan baku sebesar 5% bulan ini untuk menyelamatkan margin keuntungan bersih Anda.",
+        "Buat paket menu bundling dengan margin tinggi untuk mendongkrak penjualan agar menjauh dari titik impas Rp 145 juta."
+      ]
+    },
+    "efisiensi": {
+      "skor": 8.4,
+      "status": "SEHAT",
+      "narasi": "Pengelolaan stok barang Anda sangat rapi dengan rata-rata habis dalam 19 hari saja. Stok mati atau tidak bergerak hanya Rp 8,2 juta, atau di bawah 10% dari total stok Anda. Stok kategori kemasan adalah yang paling lama mengendap, yaitu hingga 35 hari. Pencatatan stok fisik juga sangat akurat tanpa ada selisih sama sekali dengan catatan sistem.",
+      "saran": [
+        "Buat jadwal pengecekan stok mingguan secara tertulis agar performa efisiensi yang sudah sangat bagus ini tetap terjaga konsisten."
+      ]
+    },
+    "solvabilitas": {
+      "skor": 7.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Total hutang Anda saat ini mencapai Rp 210 juta, atau 1,68 kali lebih besar dari modal bersih Anda yang sebesar Rp 125 juta. Kabar yang kurang menyenangkan, ada hutang sebesar Rp 28 juta yang akan jatuh tempo dalam 30 hari ke depan. Beban cicilan ini cukup berat karena hampir menyamai seluruh keuntungan operasional Anda. Anda harus berhati-hati agar tidak gagal bayar bulan depan.",
+      "saran": [
+        "Siapkan dana cadangan khusus minggu ini untuk membayar hutang jatuh tempo sebesar Rp 28 juta agar tidak mengganggu kas operasional.",
+        "Tunda dulu rencana pembelian aset baru atau renovasi sampai rasio hutang Anda turun di bawah 1,2 kali modal."
+      ]
+    },
+    "sdm": {
+      "skor": 7.3,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Biaya gaji untuk 8 karyawan Anda masih aman, yaitu memakan 27,4% dari total pengeluaran usaha. Produktivitas tim juga cukup baik dengan menghasilkan omset Rp 20,25 juta per karyawan. Sayangnya, tim penjualan Anda meleset dari target sebesar 15,6%, atau kurang Rp 25,32 juta dari target yang ditentukan. Hal ini menjadi salah satu penyebab utama tipisnya keuntungan bersih Anda bulan ini.",
+      "saran": [
+        "Adakan evaluasi mingguan bersama tim penjualan untuk mencari tahu kendala utama kenapa target omset meleset Rp 25,32 juta.",
+        "Berikan insentif kecil yang langsung cair jika tim berhasil mencapai target harian baru bulan ini."
+      ]
+    },
+    "kepatuhan": {
+      "skor": 10.0,
+      "status": "SEHAT",
+      "narasi": "Kepatuhan keuangan Anda luar biasa sempurna dengan nilai maksimal. Semua kewajiban pajak dan administrasi sudah lunas tanpa ada keterlambatan sama sekali. Pencatatan kas dan bank Anda juga sangat rapi dan selalu cocok selama 5 bulan berturut-turut. Kedisiplinan ini adalah fondasi yang sangat kuat untuk pertumbuhan bisnis Anda ke depan.",
+      "saran": [
+        "Dokumentasikan alur pencatatan kas harian ini menjadi SOP tertulis agar sistem yang sudah rapi ini tidak berubah jika ada pergantian staf."
+      ]
+    }
+  },
+  "konteks_pasar": [],
+  "rekomendasi_prioritas": [
+    {
+      "prioritas": 1,
+      "label": "SEGERA",
+      "aksi": "Amankan dana Rp 28 juta untuk hutang jatuh tempo",
+      "detail": "Anda memiliki hutang Rp 28 juta yang harus dibayar dalam 30 hari ini, sementara kas Anda sangat mepet. Segera sisihkan pendapatan harian atau negosiasikan pembayaran bertahap dengan kreditur sebelum tanggal jatuh tempo. Jangan gunakan dana ini untuk belanja stok non-esensial.",
+      "estimasi_dampak": "Menghindari risiko denda dan menjaga hubungan baik dengan mitra bisnis Anda."
+    },
+    {
+      "prioritas": 2,
+      "label": "BULAN_INI",
+      "aksi": "Kejar kekurangan target penjualan sebesar Rp 25,32 juta",
+      "detail": "Melesetnya target penjualan langsung membuat keuntungan bersih Anda turun drastis. Buat program promosi khusus atau tawarkan menu paket hemat untuk menarik pelanggan di Yogyakarta bulan ini. Fokus pada menu dengan margin kotor tinggi di atas 35%.",
+      "estimasi_dampak": "Menambah arus kas masuk minimal Rp 15 juta untuk memperkuat likuiditas usaha."
+    },
+    {
+      "prioritas": 3,
+      "label": "PELUANG",
+      "aksi": "Manfaatkan efisiensi stok untuk kurangi biaya pembelian",
+      "detail": "Pengelolaan stok Anda sudah sangat sehat dengan skor 8,4. Anda bisa menunda pembelian stok kategori kemasan yang saat ini masih mengendap hingga 35 hari. Alihkan dana pembelian stok tersebut untuk memperkuat cadangan kas harian Anda.",
+      "estimasi_dampak": "Menghemat pengeluaran kas bulan ini sekitar Rp 3 juta hingga Rp 5 juta tanpa mengganggu operasional dapur."
+    }
+  ]
+}

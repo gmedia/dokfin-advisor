@@ -1,0 +1,111 @@
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "DONE",
+  "generated_at": "2026-07-07T02:42:32Z",
+  "model_used": "gemini-3.1-pro-preview",
+  "token_usage": {
+    "node_a_input": 1202,
+    "node_a_output": 1746,
+    "node_c_input": 5361,
+    "node_c_output": 6234,
+    "total": 14543
+  },
+  "estimated_cost_idr": 1957.99,
+  "processing_time_seconds": 68.794,
+  "skor_keseluruhan": {
+    "nilai": 7.0,
+    "label": "Cukup Sehat",
+    "trend": "tidak_tersedia",
+    "vs_periode_lalu": null
+  },
+  "ringkasan_eksekutif": {
+    "narasi": "Usaha restoran Anda secara umum masih berjalan cukup baik, tapi ada beberapa hal yang perlu dibereskan. Insight lintas dimensi: Penjualan yang turun 12,6% membuat uang kas Anda makin mepet untuk bayar hutang jangka pendek. Kita perlu fokus naikkan penjualan dan atur ulang jadwal bayar tagihan bulan ini.",
+    "highlight_positif": [
+      "Pencatatan keuangan sangat rapi tanpa selisih selama 5 bulan berturut-turut",
+      "Stok barang terkelola baik dengan porsi barang menganggur turun Rp 3,1 juta"
+    ],
+    "highlight_warning": [
+      "Uang dan aset lancar Anda (Rp 92 juta) tidak cukup untuk bayar tagihan dekat waktu (Rp 124 juta)",
+      "Penjualan meleset Rp 25,3 juta dari target yang ditetapkan"
+    ]
+  },
+  "dimensi": {
+    "likuiditas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Uang tunai dan aset lancar Anda sebesar Rp 92 juta belum cukup untuk menutup tagihan Rp 124 juta bulan ini. Artinya, dari setiap Rp 1 tagihan, Anda baru punya Rp 0,74 untuk membayarnya. Sisa uang kas bersih Anda juga turun 22,4% menjadi Rp 4,2 juta saja. Jika tidak ada tambahan pemasukan, Anda akan kesulitan membayar tagihan dalam beberapa minggu ke depan.",
+      "saran": [
+        "Tagih segera piutang dari pelanggan segmen horeka senilai Rp 12 juta yang rata-rata sudah berumur 28 hari",
+        "Minta perpanjangan waktu bayar ke supplier untuk tagihan yang jatuh tempo bulan ini"
+      ]
+    },
+    "profitabilitas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Penjualan restoran Anda turun 12,6% dan sudah terjadi selama tiga bulan berturut-turut. Keuntungan bersih yang Anda dapatkan juga tersisa 8,2% atau turun 3,1% dari sebelumnya. Penjualan Anda saat ini di angka Rp 162 juta, hanya sedikit di atas batas aman balik modal Rp 145 juta. Anda perlu segera mencari cara untuk menarik pelanggan kembali agar keuntungan tidak terus tergerus.",
+      "saran": [
+        "Buat paket makan siang hemat atau promo khusus untuk mendongkrak penjualan bulan ini",
+        "Tunda pengeluaran yang tidak mendesak agar batas aman balik modal tidak makin tinggi"
+      ]
+    },
+    "efisiensi": {
+      "skor": 8.4,
+      "status": "SEHAT",
+      "narasi": "Pengelolaan bahan baku Anda sudah sangat baik dan rapi tanpa ada selisih pencatatan. Stok barang yang lama tidak terpakai juga sudah berkurang Rp 3,1 juta dari periode lalu. Rata-rata bahan baku Anda habis terjual dalam 19 hari, yang tergolong wajar untuk restoran. Pertahankan kebiasaan baik ini agar uang Anda tidak banyak berhenti di gudang.",
+      "saran": [
+        "Buat jadwal rutin mingguan untuk mengecek fisik bahan baku kategori bumbu dan kemasan",
+        "Dokumentasikan cara Anda mengelola stok saat ini menjadi panduan tertulis untuk karyawan baru"
+      ]
+    },
+    "solvabilitas": {
+      "skor": 7.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Total hutang Anda saat ini mencapai Rp 210 juta, lebih besar dari modal sendiri yang sebesar Rp 125 juta. Ada tagihan senilai Rp 28 juta yang harus segera dibayar dalam 30 hari ke depan. Kemampuan uang kas Anda untuk membayar cicilan hutang juga sangat mepet. Anda harus sangat berhati-hati mengambil hutang baru dalam waktu dekat.",
+      "saran": [
+        "Jangan menambah pinjaman baru dari bank atau pihak lain sampai tagihan Rp 28 juta bulan ini lunas",
+        "Sisihkan pendapatan harian khusus untuk persiapan membayar tagihan yang jatuh tempo tersebut"
+      ]
+    },
+    "sdm": {
+      "skor": 7.3,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Porsi gaji karyawan Anda masih aman di angka 27,4% dari total pendapatan restoran. Namun, tim Anda belum berhasil mencapai target penjualan bulan ini dengan selisih kekurangan Rp 25,3 juta. Setiap karyawan rata-rata menghasilkan Rp 20,2 juta, turun 8,4% dari sebelumnya. Tim perlu dorongan ekstra agar target penjualan bulan depan bisa tercapai.",
+      "saran": [
+        "Kumpulkan 8 karyawan Anda minggu ini untuk bahas ide promo yang bisa kejar kekurangan target Rp 25,3 juta",
+        "Berikan insentif kecil jika mereka berhasil membawa pelanggan rombongan baru"
+      ]
+    },
+    "kepatuhan": {
+      "skor": 10.0,
+      "status": "SEHAT",
+      "narasi": "Urusan administrasi dan pajak restoran Anda sangat beres dan tidak ada tunggakan sama sekali. Semua pencatatan keuangan sudah 100% lengkap tanpa ada bagian yang terlewat. Saldo di catatan dan rekening bank juga selalu cocok selama 5 bulan terakhir. Kondisi ini sangat bagus dan akan memudahkan Anda jika butuh pinjaman modal nantinya.",
+      "saran": [
+        "Simpan semua bukti potong pajak dan nota pembelian dalam satu folder digital setiap akhir minggu"
+      ]
+    }
+  },
+  "konteks_pasar": [],
+  "rekomendasi_prioritas": [
+    {
+      "prioritas": 1,
+      "label": "SEGERA",
+      "aksi": "Negosiasi ulang jadwal bayar tagihan bulan ini",
+      "detail": "Anda punya tagihan Rp 124 juta tapi aset lancar hanya Rp 92 juta. Hubungi supplier utama minggu ini untuk minta perpanjangan waktu bayar sebagian tagihan.",
+      "estimasi_dampak": "Uang kas Anda akan lebih lega dan terhindar dari gagal bayar tagihan senilai Rp 28 juta."
+    },
+    {
+      "prioritas": 2,
+      "label": "BULAN_INI",
+      "aksi": "Kejar kekurangan target penjualan restoran",
+      "detail": "Penjualan Anda turun 3 bulan berturut-turut dan meleset Rp 25,3 juta dari target. Buat promo paket makan bersama untuk menarik pelanggan rombongan.",
+      "estimasi_dampak": "Penjualan bisa naik mendekati target dan menjauhkan Anda dari batas kritis balik modal Rp 145 juta."
+    },
+    {
+      "prioritas": 3,
+      "label": "PELUANG",
+      "aksi": "Pertahankan sistem pencatatan stok dan kas",
+      "detail": "Pencatatan Anda sudah 100% rapi dan stok menganggur turun Rp 3,1 juta. Buat panduan tertulis sederhana agar karyawan baru nanti bisa langsung mengikuti standar ini.",
+      "estimasi_dampak": "Menghemat waktu pelatihan karyawan baru dan menjaga tingkat kesalahan pencatatan tetap di angka nol."
+    }
+  ]
+}

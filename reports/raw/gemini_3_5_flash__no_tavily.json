@@ -1,0 +1,111 @@
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "DONE",
+  "generated_at": "2026-07-07T02:44:54Z",
+  "model_used": "gemini-3.5-flash",
+  "token_usage": {
+    "node_a_input": 1202,
+    "node_a_output": 2294,
+    "node_c_input": 5359,
+    "node_c_output": 5948,
+    "total": 14803
+  },
+  "estimated_cost_idr": 1510.84,
+  "processing_time_seconds": 40.463,
+  "skor_keseluruhan": {
+    "nilai": 7.0,
+    "label": "Cukup Sehat",
+    "trend": "tidak_tersedia",
+    "vs_periode_lalu": null
+  },
+  "ringkasan_eksekutif": {
+    "narasi": "Bisnis Anda secara umum cukup sehat dengan skor 7,0, didukung oleh efisiensi stok dan kepatuhan administrasi yang luar biasa. Namun, Anda sedang menghadapi ancaman serius pada arus kas karena aset lancar tidak cukup untuk membayar hutang jangka pendek yang segera jatuh tempo. Insight lintas dimensi: Kegagalan tim penjualan mencapai target sebesar Rp 25,32 juta langsung memicu krisis kas harian dan membuat kemampuan bayar hutang Anda menjadi sangat kritis.",
+    "highlight_positif": [
+      "Pencatatan keuangan sangat rapi dengan kas dan bank yang selalu cocok selama 5 bulan berturut-turut",
+      "Pengelolaan stok sangat efisien, hanya butuh waktu 19 hari untuk habis terjual"
+    ],
+    "highlight_warning": [
+      "Aset lancar Rp 92 juta tidak cukup untuk membayar hutang lancar sebesar Rp 124 juta",
+      "Ada hutang sebesar Rp 28 juta yang akan jatuh tempo dalam waktu 30 hari ke depan"
+    ]
+  },
+  "dimensi": {
+    "likuiditas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Uang tunai dan aset lancar Anda sebesar Rp 92 juta tidak cukup untuk menutup hutang jangka pendek sebesar Rp 124 juta. Cadangan kas harian Anda sebesar Rp 11,7 juta juga sangat mepet karena pengeluaran harian mencapai Rp 10,6 juta. Untungnya, penagihan piutang Anda cukup cepat, rata-rata lunas dalam 22 hari. Namun, Anda harus waspada karena uang kas bisa habis sewaktu-waktu jika ada pengeluaran mendadak.",
+      "saran": [
+        "Segera hubungi pelanggan dari segmen horeka yang punya piutang Rp 12 juta untuk mempercepat pembayaran di bawah 20 hari.",
+        "Tunda dulu pembelian inventaris non-esensial bulan ini untuk mengamankan kas harian."
+      ]
+    },
+    "profitabilitas": {
+      "skor": 6.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Keuntungan kotor Anda sebenarnya sehat di angka 34,8% dari penjualan. Masalahnya, keuntungan bersih dari modal yang Anda tanam sendiri (ROE) minus 12,6% dan sudah turun selama 3 bulan berturut-turut. Penjualan aktual Anda sebesar Rp 162 juta juga sangat mepet dengan titik impas (BEP) sebesar Rp 145 juta. Ini artinya, biaya operasional Anda terlalu tinggi sehingga menggerus hampir seluruh keuntungan penjualan.",
+      "saran": [
+        "Evaluasi biaya operasional non-bahan baku minggu ini untuk memotong pengeluaran yang tidak menyumbang langsung ke penjualan.",
+        "Buat paket menu bundling dengan margin tinggi untuk mendongkrak penjualan di atas titik impas."
+      ]
+    },
+    "efisiensi": {
+      "skor": 8.4,
+      "status": "SEHAT",
+      "narasi": "Pengelolaan stok barang Anda sangat bagus, rata-rata hanya butuh 19 hari untuk habis terjual. Stok mati atau barang yang tidak bergerak hanya Rp 8,2 juta, atau di bawah 10% dari total stok Anda. Pencatatan stok juga sangat rapi dengan tingkat kesalahan 0% saat dicocokkan. Efisiensi ini membantu menjaga agar modal Anda tidak macet di gudang.",
+      "saran": [
+        "Dokumentasikan SOP penyimpanan bahan baku yang sudah berjalan baik ini agar konsisten saat Anda menambah karyawan baru nanti.",
+        "Lakukan pemeriksaan stok mingguan secara konsisten untuk mempertahankan akurasi pencatatan 100%."
+      ]
+    },
+    "solvabilitas": {
+      "skor": 7.0,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Total hutang Anda sebesar Rp 210 juta sudah lebih besar dari modal sendiri yang sebesar Rp 125 juta. Ditambah lagi, ada hutang sebesar Rp 28 juta yang akan jatuh tempo dalam 30 hari ke depan. Kemampuan Anda membayar cicilan dari keuntungan operasional juga sangat mepet, hanya 1,08 kali dari kewajiban. Anda harus berhati-hati agar tidak gagal bayar bulan ini.",
+      "saran": [
+        "Negosiasikan penjadwalan ulang atau perpanjangan tenor untuk hutang Rp 28 juta yang jatuh tempo bulan ini kepada kreditur.",
+        "Hindari mengambil hutang baru dalam bentuk apa pun sampai rasio hutang terhadap modal Anda turun."
+      ]
+    },
+    "sdm": {
+      "skor": 7.3,
+      "status": "PERLU_PERHATIAN",
+      "narasi": "Porsi gaji karyawan Anda masih aman di angka 27,4% dari total pengeluaran. Produktivitas tim juga cukup baik dengan rata-rata penjualan Rp 20,25 juta per karyawan. Namun, tim penjualan Anda meleset dari target sebesar Rp 25,32 juta atau hanya mencapai 84,4%. Kurangnya pencapaian target ini menjadi penyebab utama kas Anda menjadi sangat ketat.",
+      "saran": [
+        "Adakan evaluasi singkat dengan 8 karyawan Anda minggu ini untuk mencari tahu kendala penjualan di lapangan.",
+        "Berikan insentif kecil yang menarik bagi tim jika mereka berhasil mengejar kekurangan target penjualan bulan depan."
+      ]
+    },
+    "kepatuhan": {
+      "skor": 10.0,
+      "status": "SEHAT",
+      "narasi": "Kepatuhan keuangan Anda luar biasa sempurna dengan skor maksimal. Semua kewajiban pajak sudah lunas tanpa ada keterlambatan historis sama sekali. Pencatatan kas dan rekening bank Anda juga selalu cocok dan seimbang selama 5 bulan berturut-turut. Kedisiplinan administrasi seperti ini adalah fondasi yang sangat kuat untuk pertumbuhan bisnis Anda.",
+      "saran": [
+        "Pertahankan kedisiplinan ini dengan memasang alarm pengingat otomatis setiap tanggal 10 untuk persiapan laporan pajak bulan berikutnya."
+      ]
+    }
+  },
+  "konteks_pasar": [],
+  "rekomendasi_prioritas": [
+    {
+      "prioritas": 1,
+      "label": "SEGERA",
+      "aksi": "Negosiasi perpanjangan jatuh tempo hutang Rp 28 juta",
+      "detail": "Hubungi kreditur minggu ini untuk meminta kelonggaran pembayaran atau cicilan. Langkah ini krusial karena kas harian Anda saat ini sangat mepet untuk membayar tagihan tersebut.",
+      "estimasi_dampak": "Mengamankan kas operasional harian dan menghindari risiko gagal bayar bulan ini."
+    },
+    {
+      "prioritas": 2,
+      "label": "BULAN_INI",
+      "aksi": "Kejar piutang segmen horeka sebesar Rp 12 juta",
+      "detail": "Hubungi mitra horeka yang memiliki rata-rata pembayaran 28 hari untuk melakukan pelunasan lebih cepat. Tawarkan diskon kecil jika mereka membayar dalam minggu ini.",
+      "estimasi_dampak": "Menambah cadangan kas lancar hingga Rp 12 juta untuk memperkuat likuiditas."
+    },
+    {
+      "prioritas": 3,
+      "label": "PELUANG",
+      "aksi": "Buat program loyalitas pelanggan untuk kejar gap penjualan",
+      "detail": "Manfaatkan efisiensi stok bahan baku yang sangat baik untuk membuat promo paket hemat tanpa menambah biaya penyimpanan. Fokuskan tim untuk mengejar kekurangan target penjualan sebesar Rp 25,32 juta.",
+      "estimasi_dampak": "Meningkatkan penjualan aktual melewati titik impas dan menaikkan keuntungan bersih yang sempat minus."
+    }
+  ]
+}
