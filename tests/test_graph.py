@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import UUID
 
 from advisor.deps import AdvisorDeps
-from advisor.graph import run_advisor
+from advisor.graph import _normalize_google_model_name, run_advisor
 from advisor.schemas.output import (
     AdvisorResultDone,
     DimensiReportOut,
@@ -173,6 +173,50 @@ def test_payload_llm_config_overrides_default_deps(monkeypatch) -> None:
         "model_a": "gemini-a",
         "model_c": "gemini-c",
     }
+
+
+def test_google_model_name_normalization() -> None:
+    assert _normalize_google_model_name("gemini/gemini-3.1-pro-preview") == (
+        "gemini-3.1-pro-preview"
+    )
+    assert _normalize_google_model_name("models/gemini-3.1-pro-preview") == (
+        "gemini-3.1-pro-preview"
+    )
+    assert _normalize_google_model_name("google/gemini-3.5-flash") == "gemini-3.5-flash"
+    assert _normalize_google_model_name("gemini-3.1-pro-preview") == "gemini-3.1-pro-preview"
+
+
+def test_google_payload_model_prefix_is_normalized_before_build(monkeypatch) -> None:
+    payload = _load_payload()
+    payload["llm"] = {
+        "provider": "google",
+        "model_a": "gemini/gemini-2.0-flash",
+        "model_c": "models/gemini-3.1-pro-preview",
+    }
+    captured: dict[str, str | None] = {}
+
+    def fake_google_deps(**kwargs):
+        captured["model_a"] = kwargs["model_a"]
+        captured["model_c"] = kwargs["model_c"]
+        return AdvisorDeps(
+            invoke_llm_a=lambda _m: "{}",
+            invoke_llm_c=lambda _m: "{}",
+            model_name_a=kwargs["model_a"],
+            model_name_c=kwargs["model_c"],
+        )
+
+    monkeypatch.setattr("dotenv.load_dotenv", lambda: None)
+    monkeypatch.setattr("advisor.graph._build_google_genai_deps", fake_google_deps)
+
+    from advisor.graph import build_deps_for_payload
+
+    deps = build_deps_for_payload(payload)
+
+    assert captured == {
+        "model_a": "gemini-2.0-flash",
+        "model_c": "gemini-3.1-pro-preview",
+    }
+    assert deps.model_name_c == "gemini-3.1-pro-preview"
 
 
 def test_node_a_json_retry_then_ok() -> None:

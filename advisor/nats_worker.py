@@ -8,7 +8,7 @@ import os
 import time
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import nats
 import structlog
@@ -51,6 +51,22 @@ def attach_processing_time(result: dict[str, Any], seconds: float) -> dict[str, 
     if out.get("status") == "DONE" and out.get("estimated_cost_idr") is None:
         out["estimated_cost_idr"] = None
     return out
+
+
+def _failed_from_unhandled_exception(payload: dict[str, Any], exc: BaseException) -> dict[str, Any]:
+    raw_job_id = payload.get("job_id")
+    try:
+        job_id = UUID(str(raw_job_id))
+    except (TypeError, ValueError):
+        job_id = uuid4()
+    return {
+        "job_id": str(job_id),
+        "status": "FAILED",
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "error_code": ErrorCode.UNKNOWN_ERROR.value,
+        "error_message": str(exc)[:2000],
+        "retry_count": 0,
+    }
 
 
 async def ensure_streams(jsm: Any) -> None:
@@ -134,10 +150,9 @@ async def handle_job_message(
         if not from_cache:
             try:
                 result = await asyncio.to_thread(run_advisor, payload, deps)
-            except Exception:
+            except Exception as e:  # noqa: BLE001
                 _LOG.exception("advisor_unhandled_error", job_id=job_id_str)
-                await msg.nak()
-                return
+                result = _failed_from_unhandled_exception(payload, e)
 
         elapsed = time.perf_counter() - t0
         if not from_cache:

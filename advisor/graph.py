@@ -133,6 +133,13 @@ def _job_id_for_failed_response(payload: dict[str, Any]) -> UUID:
     return uuid4()
 
 
+def _error_code_for_exception(exc: BaseException) -> ErrorCode:
+    msg = str(exc).lower()
+    if isinstance(exc, TimeoutError) or any(x in msg for x in ("timeout", "timed out")):
+        return ErrorCode.LLM_TIMEOUT
+    return ErrorCode.UNKNOWN_ERROR
+
+
 def _llm_timeout_s(*, google: bool) -> float:
     if google:
         raw = os.environ.get("GOOGLE_TIMEOUT_S")
@@ -149,6 +156,17 @@ def _provider_from_payload_or_env(llm: LlmConfig | None) -> str:
     if provider in ("gemini", "genai"):
         return "google"
     return provider
+
+
+def _normalize_google_model_name(model: str | None) -> str | None:
+    if model is None:
+        return None
+    normalized = model.strip()
+    for prefix in ("models/", "gemini/", "google/"):
+        if normalized.startswith(prefix):
+            normalized = normalized.removeprefix(prefix)
+            break
+    return normalized
 
 
 def _build_openai_deps(
@@ -268,6 +286,8 @@ def build_deps_for_payload(
     tavily_client = base_deps.tavily_client if base_deps else None
     cache = base_deps.cache if base_deps else None
     if provider in ("google", "gemini", "genai"):
+        model_a = _normalize_google_model_name(model_a)
+        model_c = _normalize_google_model_name(model_c)
         return _build_google_genai_deps(
             model_a=model_a,
             model_c=model_c,
@@ -305,6 +325,32 @@ def _resolve_deps_for_payload(validated: JobPayload, deps: AdvisorDeps | None) -
 def run_advisor(payload: dict[str, Any], deps: AdvisorDeps | None = None) -> dict[str, Any]:
     """Jalankan graph; return dict DONE atau FAILED (JSON-friendly)."""
     configure_logging()
+    t0 = time.perf_counter()
+
+    def _with_processing_time(result: dict[str, Any]) -> dict[str, Any]:
+        merged = dict(result)
+        merged["processing_time_seconds"] = round(time.perf_counter() - t0, 3)
+        return merged
+
+    def _failed_from_exception(
+        exc: BaseException,
+        *,
+        error_code: ErrorCode,
+        retry_count: int,
+        deps_for_telemetry: AdvisorDeps | None = None,
+    ) -> dict[str, Any]:
+        failed = AdvisorResultFailed(
+            job_id=_job_id_for_failed_response(payload),
+            generated_at=datetime.now(UTC),
+            error_code=error_code,
+            error_message=str(exc)[:2000],
+            retry_count=retry_count,
+        )
+        base = failed.model_dump(mode="json")
+        if deps_for_telemetry is not None:
+            base = merge_telemetry_into_result(deps_for_telemetry, base)
+        return _with_processing_time(base)
+
     try:
         validated = JobPayload.model_validate(payload)
     except ValidationError as e:
@@ -315,34 +361,40 @@ def run_advisor(payload: dict[str, Any], deps: AdvisorDeps | None = None) -> dic
             error_message=str(e)[:2000],
             retry_count=0,
         )
-        return failed.model_dump(mode="json")
+        return _with_processing_time(failed.model_dump(mode="json"))
 
     bind_job_context(job_id=str(validated.job_id))
-    deps = _resolve_deps_for_payload(validated, deps)
+    try:
+        deps = _resolve_deps_for_payload(validated, deps)
+    except Exception as e:  # noqa: BLE001
+        _LOG.exception("llm_deps_resolution_failed", job_id=str(validated.job_id))
+        return _failed_from_exception(
+            e,
+            error_code=_error_code_for_exception(e),
+            retry_count=0,
+        )
 
     if deps.token_usage is not None:
         deps.token_usage.reset()
-
-    t0 = time.perf_counter()
-
-    def _with_processing_time(result: dict[str, Any]) -> dict[str, Any]:
-        merged = dict(result)
-        merged["processing_time_seconds"] = round(time.perf_counter() - t0, 3)
-        return merged
 
     try:
         app = build_graph(deps).compile()
         out = app.invoke({"payload": payload})
     except RuntimeError as e:
-        failed = AdvisorResultFailed(
-            job_id=_job_id_for_failed_response(payload),
-            generated_at=datetime.now(UTC),
+        return _failed_from_exception(
+            e,
             error_code=ErrorCode.LLM_INVALID_JSON,
-            error_message=str(e)[:2000],
             retry_count=MAX_LLM_ATTEMPTS,
+            deps_for_telemetry=deps,
         )
-        base = failed.model_dump(mode="json")
-        return _with_processing_time(merge_telemetry_into_result(deps, base))
+    except Exception as e:  # noqa: BLE001
+        _LOG.exception("advisor_graph_unhandled_error", job_id=str(validated.job_id))
+        return _failed_from_exception(
+            e,
+            error_code=_error_code_for_exception(e),
+            retry_count=0,
+            deps_for_telemetry=deps,
+        )
 
     if out.get("final_output"):
         return _with_processing_time(merge_telemetry_into_result(deps, out["final_output"]))
